@@ -20,7 +20,10 @@ export default defineConfig({
       'script',
       {},
       "window.dataLayer = window.dataLayer || [];\nfunction gtag(){dataLayer.push(arguments);}\ngtag('js', new Date());\ngtag('config', 'G-N86HQ8Z06L');"
-    ]
+    ],
+    // 声明深色支持
+    ['meta', { name: 'darkreader-lock' }],
+    ['meta', { name: 'color-scheme', content: 'dark light' }]
   ],
   themeConfig: {
     search: {
