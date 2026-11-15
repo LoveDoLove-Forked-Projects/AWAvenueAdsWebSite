@@ -7,6 +7,7 @@ export default defineConfig({
 
   themeConfig: {
     nav: nav(),
+    notFound: { title: 'Page not found', quote: 'This page got blocked as an ad.', linkText: 'Back to home', linkLabel: 'Back to home' },
     footer: {
       message:
         'Original documentation: <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> · Rules: <a href="https://github.com/TG-Twilight/AWAvenue-Ads-Rule/blob/main/LICENSE">GPLv3</a>'

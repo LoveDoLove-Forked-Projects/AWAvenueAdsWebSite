@@ -1,28 +1,21 @@
----
-lastVerified: 2026-10-26
-verificationScope: docs
----
-
 # MosDNS v5 guide
 
-Applies to **MosDNS v5 (verification version: 5.3.4)**. Documentation checked: **2026-10-26**. Router packages may generate their own configuration; use their custom-rule facility to avoid having your edits overwritten.
+This is the YAML syntax for upstream MosDNS v5. Router plugin builds usually generate their own config; use the plugin's custom rule entry so updates don't overwrite your changes.
 
 ## Download the domain list
 
-Select **MosDNS v5** and your profile in the [generator](./Sub.html?tool=mosdns). The `.txt` file is `domain_set` data, not a complete YAML configuration or an AdGuard list.
-
-Run this Linux example from your MosDNS configuration directory. The URL below is the full profile; substitute your generated URL if you chose another profile.
+Choose **MosDNS v5** and a profile in the [subscription builder](./Sub.html?tool=mosdns) and copy the `.txt` link. Download it in your MosDNS config directory (the example uses the full-profile link):
 
 ```sh
 mkdir -p rules
-curl -fL --retry 2 'https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Mosdns_v5.txt' -o rules/awa-ads.txt.new
+curl -fL --retry 2 'https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Mosdns_v5.txt' -o rules/awa-ads.txt.new && mv rules/awa-ads.txt.new rules/awa-ads.txt
 ```
 
-Check the download succeeded and contains expressions such as `full:domain` and `domain:domain`, rather than HTML or an empty file. Then rename it to `rules/awa-ads.txt`. Keep the old file on failure. On Windows, you can download and save the file manually.
+Downloading to `.new` first keeps the old file if the download fails.
 
-## Load and use the list
+## Add it to the config
 
-This minimal standalone `config.yaml` listens on **127.0.0.1:5353** for testing. For an existing installation, merge the relevant plugins and sequence steps instead of replacing your configuration. Replace the example upstream with a DNS server you can reach if necessary.
+Below is a minimal `config.yaml` that runs as-is, listening on `127.0.0.1:5353`. With an existing config, just merge `awa_domains` and the `matches` / `exec` step. Replace the upstream with your own DNS.
 
 ```yaml
 log:
@@ -56,24 +49,26 @@ plugins:
       listen: 127.0.0.1:5353
 ```
 
-Define `domain_set` before the sequence referencing it. Put its match/reject step in the sequence actually used by your listeners, before cache returns and forwarding. Merely defining the set does not filter anything. `reject 3` ends processing with NXDOMAIN.
+- Define `domain_set` before the `sequence` that references it.
+- Put the blocking step **before** cache and upstream forwarding.
+- `reject 3` returns NXDOMAIN.
 
 ## Start and verify
 
-1. From the configuration directory, run `mosdns start -c config.yaml`. Check startup logs for missing files or plugin references. Use `-d` to specify the working directory when launching elsewhere.
-2. Replace `blocked.example` below with a domain actually present in your downloaded profile. Run both UDP and TCP checks with `dig` installed:
-
 ```sh
-dig @127.0.0.1 -p 5353 blocked.example A
-dig +tcp @127.0.0.1 -p 5353 blocked.example A
+mosdns start -c config.yaml
+dig @127.0.0.1 -p 5353 ad.doubleclick.net A
 dig @127.0.0.1 -p 5353 example.com A
 ```
 
-3. The listed domain should return **NXDOMAIN**; the unlisted control should resolve through the upstream. If both fail, check connectivity and upstream settings. Ordinary device queries also need to use your deployed MosDNS service to be filtered.
-4. After updating the file, restart/reload MosDNS through your deployment's supported procedure so the domain set is read again. For scheduled updates, download, validate, replace, then restart; retain the last working file on failure.
+The first should return **NXDOMAIN**; the second resolves normally.
 
-Official references: [v5 data plugins](https://irine-sistiana.gitbook.io/mosdns-wiki/mosdns-v5/ru-he-pei-zhi-mosdns/shu-ju-cha-jian), [sequence and reject](https://irine-sistiana.gitbook.io/mosdns-wiki/mosdns-v5/ru-he-pei-zhi-mosdns/sequence-cha-jian), and [releases](https://github.com/IrineSistiana/mosdns/releases).
+## Scheduled updates
 
-## Updates and rollback
+MosDNS reads the list only at startup, so restart it (or reload however your deployment does) after downloading a new file. A scheduled job can do download → rename → restart.
 
-Check the queried domain and selected list first. For troubleshooting, remove the `matches: qname $awa_domains` / `exec: reject 3` step from the active sequence, keep upstream forwarding, then restart and retest. Before removing the `awa_domains` plugin, remove its references from every sequence. To roll back a list update, restore the last working `awa-ads.txt` and restart, or restore your previous configuration backup.
+References: [v5 data plugins](https://irine-sistiana.gitbook.io/mosdns-wiki/mosdns-v5/ru-he-pei-zhi-mosdns/shu-ju-cha-jian), [sequence and reject](https://irine-sistiana.gitbook.io/mosdns-wiki/mosdns-v5/ru-he-pei-zhi-mosdns/sequence-cha-jian).
+
+## Undo
+
+Remove the `matches: qname $awa_domains` / `exec: reject 3` step from the sequence and restart.

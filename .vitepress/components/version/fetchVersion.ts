@@ -20,7 +20,7 @@ async function fetchVersion() {
       const data = await response.json()
       if (data.name && data.published_at && data.body) {
         versionInfo.version = data.name
-        versionInfo.date = data.published_at
+        versionInfo.date = String(data.published_at).slice(0, 16).replace('T', ' ')
         versionInfo.info = data.body
         versionInfo.loaded = true
         return

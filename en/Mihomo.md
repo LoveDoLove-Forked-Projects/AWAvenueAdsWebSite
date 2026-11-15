@@ -1,29 +1,23 @@
----
-lastVerified: 2026-10-26
-verificationScope: docs
----
+# Clash / Mihomo guide
 
-# Mihomo guide
+For clients running the Mihomo core. Older Clash cores don't support MRS; use YAML there.
 
-For clients using the Mihomo core with custom `rule-providers` support. The reference version is **Mihomo 1.19.33**. Check your client's actual core and version; older Clash cores and other engines may support different formats.
+## Choose a format
 
-## Choose a format and plan
+Pick a format and profile in the [subscription builder](./Sub.html?tool=clash) and copy the link. Any one of the three works:
 
-In the [subscription generator](./Sub.html?tool=clash), choose a tool format first, answer the plan preferences, and copy the resulting URL. Use one format only. These files are rule sets, not complete proxy subscriptions.
-
-| Generator format | behavior | format | Instructions |
+| Builder format | behavior | format | Guide |
 | --- | --- | --- | --- |
 | [Clash / Mihomo YAML](./Sub.html?tool=clash) | `domain` | `yaml` | [Domain YAML](#yaml) |
 | [Clash / Mihomo MRS](./Sub.html?tool=clashMrs) | `domain` | `mrs` | [MRS](#mrs) |
 | [Clash / Mihomo Classical](./Sub.html?tool=clashClassical) | `classical` | `yaml` | [Classical YAML](#classical) |
 
-All examples below are **configuration fragments** with **full protection** URLs. Replace `url` with the generator URL for your chosen plan and source. Keep the file content, `behavior`, and `format` consistent; changing a filename extension does not convert its format.
+- **Classical** adds a few `DOMAIN-KEYWORD` rules and has the widest coverage. Pick it if unsure.
+- **MRS** is the smallest and loads fastest, but only the Mihomo core can read it.
 
-The full-profile snapshots checked on this date contain 972 rules in domain YAML / MRS and 976 in Classical YAML. Classical additionally includes four `DOMAIN-KEYWORD` entries. The published formats do not have identical coverage; choose Classical if you need these keyword rules. Counts may change with later releases.
+These are rule providers, not proxy subscriptions, so don't import them as subscriptions. The examples use the full-profile link; swap in the one you copied and keep `behavior` / `format` matched to the format.
 
 ## Domain YAML {#yaml}
-
-The published file contains `payload:` with domain expressions, such as exact domains and `+.example.com`. Use `behavior: domain`.
 
 ```yaml
 rule-providers:
@@ -40,7 +34,7 @@ rules:
 
 ## MRS binary rule set {#mrs}
 
-MRS is binary and cannot be edited as text. This project's MRS contains domain rules: use `behavior: domain` and `format: mrs`, never `behavior: classical`. Update an unsupported core or use domain YAML above.
+MRS is a binary file; it looks like gibberish in a browser, which is normal.
 
 ```yaml
 rule-providers:
@@ -57,8 +51,6 @@ rules:
 
 ## Classical YAML {#classical}
 
-The file contains `payload:` with typed entries such as `DOMAIN,` and `DOMAIN-SUFFIX,`. Use `behavior: classical` with `format: yaml`.
-
 ```yaml
 rule-providers:
   awa_ads:
@@ -72,43 +64,29 @@ rules:
   - RULE-SET,awa_ads,REJECT
 ```
 
-## Merge into a persistent configuration
+## Merge into your config
 
-1. Back up a working configuration. Use your client's persistent override, merge, extension, or script feature and consult its documentation. Editing a generated subscription file directly may lose changes on its next update.
-2. Merge `awa_ads` into the existing `rule-providers` mapping, and insert `RULE-SET,awa_ads,REJECT` into existing `rules`. Avoid duplicate top-level keys and preserve your proxies, groups, and other rules.
-3. Rules match from top to bottom. Put the entry before `MATCH` and broad `DIRECT` rules that could match first. Necessary, narrowly scoped exceptions can precede it. `REJECT` is built in; no group with that name is needed.
-4. Use Rule mode, save, and reload. `path` is a unique cache path inside the core's configuration directory, which must be writable. Do not share one path across different formats.
+1. Back up your working config.
+2. Add the snippet through your client's override, merge, or extension feature. Editing the downloaded subscription file directly gets overwritten on the next update.
+3. Merge `awa_ads` into the existing `rule-providers` and `RULE-SET,awa_ads,REJECT` into the existing `rules`, **above `MATCH` and any broad `DIRECT` rules**. Don't add a second `rules:` key; it would replace your existing rules.
+4. Use Rule mode, save, and reload.
 
-If a command-line core is available, check the **complete merged configuration** using a separate configuration directory:
+With a command-line core you can test the merged config first:
 
 ```sh
 mihomo -t -d ./mihomo-check -f ./merged.yaml
 ```
 
-On Windows use the actual `mihomo.exe` path. A successful syntax check does not prove the rule set downloaded or traffic matched.
+## Check that it works
 
-## Verify downloads and matches
+Find `awa_ads` in the client's or dashboard's rule provider list; a non-zero entry count means the download worked. Connection logs then show requests matched by `awa_ads` and rejected.
 
-Find `awa_ads` in your client's or dashboard's rule-provider list. Check for a nonzero rule count, a reasonable update time, and no download or parsing errors. For YAML, inspect `payload` and version comments. For MRS, check that the core loaded it successfully; unreadable text in a browser is expected for a binary file.
+If nothing matches, check that you're in Rule mode, that the snippet was actually merged, and that the `RULE-SET` line isn't below a rule that matches first.
 
-Choose a domain actually present in your selected list and make a request through Mihomo's proxy entry point. Check connection records or logs for `awa_ads` and `REJECT`, and visit a normal site as a control. Missing ads or a failed page alone do not establish a match: caches, other rules, and routing through the core matter.
+## Update and undo
 
-If it does not match, check Rule mode, the active merged configuration, rule order, application routing, and whether a domain is available for matching. These routing rules do not automatically capture DNS or traffic that bypasses Mihomo.
+`interval: 86400` updates once a day; you can also update `awa_ads` manually in the dashboard. Updating your proxy subscription doesn't update rule providers.
 
-## Updates and rollback
+For a false positive, find the domain in the connection log and add an allow rule above the `RULE-SET` line, e.g. `DOMAIN,needed.example,DIRECT`. To disable entirely, remove the `RULE-SET,awa_ads,REJECT` line and reload.
 
-`interval: 86400` requests a daily HTTP provider update while the core is running. You can also update `awa_ads` manually in the client or dashboard. Updating the main proxy subscription does not necessarily refresh rule providers immediately. Keep a working cache when downloads fail; check the URL, network, and format before deleting caches.
-
-For a false positive, inspect the matched domain and add a narrow exception before `RULE-SET`, using an appropriate policy from your existing configuration. Avoid allowing a whole parent domain unnecessarily. To disable the set, remove or comment out `RULE-SET,awa_ads,REJECT` and reload; restore the backup if needed. Reports should include the core version, plan, domain, and relevant logs with credentials and personal data removed.
-
-## Verification scope and sources
-
-Official documentation and the three published file formats were checked on 2026-10-26. Core validation is described below. Client override interfaces, traffic capture on real devices, and every mirror were not individually tested.
-
-Using the official Mihomo 1.19.33 Windows core after checking the release asset SHA-256, all three complete configurations passed `-t` in isolated directories. The published domain YAML and MRS each loaded 972 entries; Classical YAML loaded 976. For each format, a request through a temporary local proxy matched `awa_ads` → `REJECT` for one listed domain, while a normal local HTTP control passed. Separate caches and loopback listeners were used without changing system proxy or DNS settings. This does not establish testing of client merge interfaces or device traffic capture.
-
-- [Mihomo rule-provider fields](https://wiki.metacubex.one/config/rule-providers/)
-- [Rule-provider content formats](https://wiki.metacubex.one/config/rule-providers/content/)
-- [Routing rules and priority](https://wiki.metacubex.one/config/rules/)
-- [Official Mihomo release](https://github.com/MetaCubeX/mihomo/releases/tag/v1.19.33)
-- [秋风广告规则（AWAvenue-Ads-Rule） published files](https://github.com/TG-Twilight/AWAvenue-Ads-Rule/tree/main/Filters)
+References: [rule-providers](https://wiki.metacubex.one/config/rule-providers/), [rules and matching order](https://wiki.metacubex.one/config/rules/).

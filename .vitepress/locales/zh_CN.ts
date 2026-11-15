@@ -7,6 +7,7 @@ export default defineConfig({
 
   themeConfig: {
     nav: nav(),
+    notFound: { title: '页面不见了', quote: '这个页面被当成广告拦截了。', linkText: '回首页', linkLabel: '回首页' },
     footer: {
       message:
         '原创文档: <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> · 规则: <a href="https://github.com/TG-Twilight/AWAvenue-Ads-Rule/blob/main/LICENSE">GPLv3</a>'

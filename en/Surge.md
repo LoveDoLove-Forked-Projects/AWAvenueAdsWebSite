@@ -1,54 +1,47 @@
----
-lastVerified: 2026-10-26
-verificationScope: docs
----
-
 # Surge guide
 
-Applies to remote rule sets in **Surge iOS 5.x / Mac 5.x and 6.x**. This project's module includes `pre-matching`, which requires **iOS 5.14.0+ / Mac 5.9.0+**. Documentation and published file checked: **2026-10-26**. This update did not perform imports on an Apple device; menu locations may vary.
-
-Choose a format and profile in the [generator](./Sub.html?tool=surgeRuleSet). Use **one** method below. For a non-editable managed profile, use a module or the custom-rule mechanism permitted by your profile provider.
+Choose a format and profile in the [subscription builder](./Sub.html?tool=surgeRuleSet). Use **one** of the three methods below, not several. If your profile is hosted by someone else and can't be edited, the module is the easiest.
 
 ## RULE-SET {#rule-set}
 
-Choose **Surge / Surfboard RULE-SET** and copy its `.list` URL. Add the following line to your existing `[Rule]` section, before broad allow rules and `FINAL`. This example is the full profile; substitute your copied URL for another profile.
+Choose **Surge / Surfboard RULE-SET**, copy the `.list` link, and add it under `[Rule]`, above `FINAL` and any broad allow rules (the example uses the full-profile link):
 
 ```ini
 [Rule]
 RULE-SET,https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Surge-RULE-SET.list,REJECT
 ```
 
-Preserve other rules, save/reload the profile, and refresh remote resources. This file contains typed entries such as `DOMAIN` and `DOMAIN-SUFFIX`; do not use a module URL here.
-
 ## DOMAIN-SET {#domain-set}
 
-Choose **Surge / Surfboard DOMAIN-SET** and use its domain-list URL:
+Choose **Surge / Surfboard DOMAIN-SET**. It's a plain domain list and matches faster than RULE-SET:
 
 ```ini
 [Rule]
 DOMAIN-SET,https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Surge.list,REJECT
 ```
 
-Replace the URL for your chosen profile. DOMAIN-SET files contain bare domains; a leading dot includes subdomains. They are not interchangeable with RULE-SET files.
+RULE-SET and DOMAIN-SET files have different formats; their links aren't interchangeable.
 
 ## Surge module {#module}
 
-1. Select **Surge Module** in the [generator](./Sub.html?tool=surgeModule), choose your profile, and copy the `.sgmodule` URL.
-2. In Surge's module manager, install from URL, download, and enable the module. Do not replace your entire configuration with it.
-3. Its domain rules already use `REJECT` and are inserted before the main profile's rules. The published module does not require a CA certificate or HTTPS decryption.
-4. Check the module's download/update status separately from remote rule sets. If an older version rejects its parameters, use RULE-SET instead.
+Requires Surge iOS 5.14.0 / Mac 5.9.0 or later.
 
-## Verify the import
+1. In the [builder](./Sub.html?tool=surgeModule), choose **Surge Module** and a profile, and copy the `.sgmodule` link.
+2. In Surge, open **Modules** → install from URL, paste the link, and enable it.
+3. The module only has domain block rules; no certificate or MitM needed.
 
-- Refresh the resource/module and check for download or parsing errors. Confirm the URL still matches your selected profile.
-- Enable Surge in Rule mode. Choose a domain present in your downloaded list, request it through Surge, and inspect the request record for the matching rule and **REJECT** policy.
-- If allowed, check earlier rules, module state, and whether traffic bypasses Surge. A connection failure from another rule is not evidence that this list matched.
-- Replace and refresh the original URL when changing profiles; avoid duplicate enabled profiles.
+## Check that it works
 
-For Surfboard, use its documented [RULE-SET](https://getsurfboard.com/docs/profile-format/rule/ruleset/) or [DOMAIN-SET](https://getsurfboard.com/docs/profile-format/rule/domainset/) workflow. Surge module instructions and version requirements do not apply to Surfboard.
+- With Surge running in rule mode, the request log shows requests matched by AWAvenue Ads Rule with the **REJECT** policy.
+- If nothing matches, check rule order and whether the module is enabled.
+- When switching profiles, replace the old link instead of running two at once.
 
-Official references: [Surge rule sets](https://manual.nssurge.com/rules/ruleset.html), [domain rules and version requirements](https://manual.nssurge.com/rules/domain.html), and [modules](https://manual.nssurge.com/profile/module.html).
+Surfboard users: use the [RULE-SET](https://getsurfboard.com/docs/profile-format/rule/ruleset/) or [DOMAIN-SET](https://getsurfboard.com/docs/profile-format/rule/domainset/) method.
 
-## Updates and rollback
+References: [Surge rule sets](https://manual.nssurge.com/rules/ruleset.html), [domain rules](https://manual.nssurge.com/rules/domain.html), [modules](https://manual.nssurge.com/profile/module.html).
 
-To troubleshoot, disable this module or comment out its RULE-SET / DOMAIN-SET line, then reload the active profile. Leave unrelated rules enabled so you can isolate this list. Restore the previous profile backup if needed. If an earlier module rejection prevents a main-profile allow exception, disable the module and use a rule set whose position you can control.
+## Undo
+
+Disable the module, or comment out the rule line and reload the profile.
+
+Module rules are placed before your main profile, so allow rules in the main profile don't override them. If you need your own exceptions, use RULE-SET or DOMAIN-SET and put the allow rules above it.

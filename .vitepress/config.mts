@@ -3,17 +3,13 @@ import locales from './locales'
 import { tokenizeSearch } from './search-tokenizer.mjs'
 
 export default defineConfig({
-  lastUpdated: true, // Git 页面修改时间；技术核验使用独立的 lastVerified 字段
+  lastUpdated: true, // Git 页面修改时间
   title: '秋风广告规则', // 网站标题
   locales: locales.locales, // 国际化配置
   srcExclude: ['README.md'], // 排除 README.md 文件
   head: [
     // 设置主题颜色
-    ['meta', { name: 'theme-color', content: '#0A3FAC' }],
-    // 引入 MiSans 简体中文/拉丁字体
-    ['link', { rel: 'stylesheet', href: 'https://font.sec.miui.com/font/css?family=MiSans:200,300,400,450,500,600,650,700:Chinese_Simplify,Latin&display=swap' }],
-    // 引入 MiSans 繁体中文/拉丁字体
-    ['link', { rel: 'stylesheet', href: 'https://font.sec.miui.com/font/css?family=MiSans:200,300,400,450,500,600,650,700:Chinese_Traditional,Latin&display=swap' }],
+    ['meta', { name: 'theme-color', content: '#0c0d16' }],
     // 谷歌分析 (Google Analytics) 代码
     ['script', { async: '', src: 'https://www.googletagmanager.com/gtag/js?id=G-N86HQ8Z06L' }],
     [
@@ -43,7 +39,7 @@ export default defineConfig({
                 displayDetails: '显示详细结果',
                 resetButtonTitle: '清除搜索',
                 backButtonTitle: '返回',
-                noResultsText: '没有找到相关结果',
+                noResultsText: '没找到，这次真不是我们拦的',
                 footer: {
                   selectText: '选择',
                   selectKeyAriaLabel: '回车键',
@@ -63,7 +59,7 @@ export default defineConfig({
                 displayDetails: 'Show detailed results',
                 resetButtonTitle: 'Clear search',
                 backButtonTitle: 'Back',
-                noResultsText: 'No results found',
+                noResultsText: 'Nothing found, and no, we did not block it',
                 footer: {
                   selectText: 'Select',
                   selectKeyAriaLabel: 'Enter',
@@ -83,7 +79,7 @@ export default defineConfig({
                 displayDetails: '顯示詳細結果',
                 resetButtonTitle: '清除搜尋',
                 backButtonTitle: '返回',
-                noResultsText: '找不到相關結果',
+                noResultsText: '找不到，這次真的不是我們攔的',
                 footer: {
                   selectText: '選取',
                   selectKeyAriaLabel: 'Enter 鍵',

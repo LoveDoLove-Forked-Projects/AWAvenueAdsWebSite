@@ -1,19 +1,14 @@
----
-lastVerified: 2026-10-26
-verificationScope: docs
----
-
 # sing-box 使用教程
 
-适用版本：sing-box **1.14.x**；文档核验日期：**2026-10-26**。以下使用当前 HTTP 客户端和 DNS 规则动作格式，不适用于原样粘贴到旧版本。图形客户端请先查看内置核心版本。
+下面的写法适用于 sing-box **1.14** 及以后。图形客户端请先看一下内置核心的版本。
 
-## 取得与你的方案一致的规则
+## 取得规则链接
 
-在[订阅生成器](./Sub.html?tool=singbox)选择 sing-box 与拦截偏好，复制 `.json` 链接。它是 **source 格式的规则集**，不是完整的 sing-box 配置；不要把它作为整个代理配置导入。
+在[订阅生成器](./Sub.html?tool=singbox)选 sing-box 和方案，复制 `.json` 链接。它是 source 格式的规则集，不是完整配置。
 
 ## 合并配置
 
-下面是完整防护方案的示例片段。选择了其他方案时，将 `url` 换成刚复制的链接。把各数组中的条目合并到现有配置，不要覆盖原有 DNS、入站和代理设置；同名标签只定义一次。
+示例用的是完整版链接，换成你复制的即可。把各部分合并到现有配置的对应位置，不要覆盖原有的 DNS、入站和出站。
 
 ```json
 {
@@ -53,20 +48,19 @@ verificationScope: docs
 }
 ```
 
-- 将这条拦截规则放在可能提前处理同一请求的宽泛 DNS 规则之前；有意设置的放行例外可以放在它前面。
-- 将 `awa-bootstrap` 追加到原有 DNS 服务器列表。它使用系统解析器为规则下载解析域名；正常 DNS 上游仍沿用你的现有设置。系统 DNS 不应回指同一个尚未启动的 sing-box，以免下载时循环依赖。
-- 此片段只处理**进入 sing-box DNS 模块的查询**。入站的 DNS 接管沿用现有配置；应用自己的 DoH、缓存或直接 IP 连接不一定经过这里。需要连接层过滤时，可在现有 `route.rules` 中另加 `{"rule_set":"awa-ads","action":"reject"}`，但请求仍需有可匹配的域名信息。
-- `.json` 对应 `format: "source"`。若自行换成 `.srs`，必须同时改为 `binary`。使用可访问的下载源；不要恢复旧的 `download_detour` 或 `rcode://success` 写法。
+- 这条 DNS 拒绝规则放在其他宽泛的 DNS 规则前面。
+- `awa-bootstrap` 用系统 DNS 解析规则下载地址，避免 sing-box 还没启动就要靠自己解析的死循环。
+- 想在连接层也拦一道，在 `route.rules` 里加 `{"rule_set":"awa-ads","action":"reject"}`。
+- 自己换成 `.srs` 链接的话，`format` 要改成 `binary`。
 
-## 检查配置并确认生效
+## 检查并确认生效
 
-1. 对**合并后的完整配置**执行 `sing-box check -c config.json`，排除语法、重复标签和缺失引用。
-2. 启动后查看日志，确认远程规则集成功下载并加载。语法检查通过并不代表下载成功；首次下载失败时先检查网络或换来源。若已有 `experimental.cache_file`，可启用其 `enabled` 保存远程规则缓存，保留原有其他选项。
-3. 从所选规则文件中挑选一个确实存在的域名，将 DNS 查询发给自己的 sing-box DNS 入口。此示例命中后返回 **REFUSED**；同时检查调试日志中的规则匹配，再用一个不在列表中的正常域名对照。不要只凭浏览器打不开判断生效。
-4. 若仍能解析，检查查询是否经过 sing-box、前置放行规则与客户端缓存；更新规则后重新测试。
+1. `sing-box check -c config.json` 检查合并后的配置。
+2. 启动后看日志，确认规则集下载成功。已有 `experimental.cache_file` 的话打开 `enabled`，规则集会缓存到本地，下次启动不用重新下载。
+3. 用列表里的一个域名做 DNS 查询，应返回 **REFUSED**；正常域名照常解析。
 
-旧的 DNS server `address` 格式已在 1.14.0 移除。依据：[迁移与弃用说明](https://sing-box.sagernet.org/deprecated/#legacy-dns-server-formats)、[DNS 规则动作](https://sing-box.sagernet.org/configuration/dns/rule_action/)、[远程规则集](https://sing-box.sagernet.org/configuration/rule-set/)、[HTTP 客户端](https://sing-box.sagernet.org/configuration/shared/http-client/)。
+参考：[DNS 规则动作](https://sing-box.sagernet.org/configuration/dns/rule_action/)、[远程规则集](https://sing-box.sagernet.org/configuration/rule-set/)、[HTTP 客户端](https://sing-box.sagernet.org/configuration/shared/http-client/)、[1.14 迁移说明](https://sing-box.sagernet.org/deprecated/#legacy-dns-server-formats)。
 
-## 更新与回退
+## 撤回
 
-误拦截时先查看实际命中的域名。临时排障可移除本教程添加的 `dns.rules` 拒绝条目，以及你另外添加的 `route.rules` 拒绝条目，检查完整配置后重启。若还要删除 `route.rule_set` 中的 `awa-ads`，须先移除所有引用它的规则，避免留下失效标签；下载客户端和 DNS 服务器若仍被其他配置引用，不要一并删除。需要完整回退时恢复原配置备份。
+删掉 `dns.rules` 里的这条拒绝规则（以及你在 `route.rules` 加的那条）就停用了。还要删 `route.rule_set` 里的 `awa-ads` 的话，先确认没有别的规则引用它。

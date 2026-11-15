@@ -17,7 +17,7 @@ async function fixture(t) {
     await writeFile(target, text)
   }
   for (const prefix of ['', 'en/', 'zh_TW/']) {
-    await put(`${prefix}Guide.md`, '---\nlastVerified: 2026-10-26\nverificationScope: docs\n---\n# Guide', true)
+    await put(`${prefix}Guide.md`, '# Guide', true)
     await put(`${prefix}Guide.html`, '<h1 id="guide">Guide</h1><h2 id="yaml">YAML</h2><a href="./">Home</a><a href="Guide.html#yaml">Format</a>')
     await put(`${prefix}index.html`, '<a href="Guide.html#guide">Guide</a><img src="/assets/logo.svg"><script src="/assets/app.js"></script>')
   }
@@ -56,14 +56,6 @@ test('rejects missing translated source and missing translated output independen
   const errors = (await checkDocs(f.options)).errors.join('\n')
   assert.match(errors, /en\/Guide\.md/)
   assert.match(errors, /zh_TW\/Guide\.html/)
-})
-
-test('rejects impossible verification dates and missing verification scope', async t => {
-  const f = await fixture(t)
-  await f.put('Guide.md', '---\nlastVerified: 2026-02-30\n---\n# Guide', true)
-  const errors = (await checkDocs(f.options)).errors.join('\n')
-  assert.match(errors, /lastVerified/)
-  assert.match(errors, /verificationScope/)
 })
 
 test('rejects missing HTML and CSS assets, srcset candidates, and wrong filename case', async t => {

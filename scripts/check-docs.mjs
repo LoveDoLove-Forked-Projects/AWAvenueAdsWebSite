@@ -51,11 +51,6 @@ function htmlData(html) {
   return { ids, references }
 }
 
-function scalar(frontmatter, key) {
-  const value = frontmatter.match(new RegExp(`^${key}:\\s*(.*?)\\s*$`, 'm'))?.[1]
-  return value?.replace(/\s+#.*$/, '').replace(/^(['"])(.*)\1$/, '$2')
-}
-
 export async function checkDocs({
   sourceDir = process.cwd(),
   distDir = join(sourceDir, '.vitepress/dist'),
@@ -119,20 +114,10 @@ export async function checkDocs({
   for (const locale of tutorialLocales) {
     for (const id of tutorialIds) {
       const source = `${locale.prefix.slice(1)}${locale.prefix ? '/' : ''}${id}.md`
-      let markdown
       try {
-        markdown = await readFile(join(sourceDir, source), 'utf8')
+        await readFile(join(sourceDir, source), 'utf8')
       } catch {
         errors.push(`Missing tutorial translation: ${source}`)
-      }
-      if (markdown !== undefined) {
-        const frontmatter = markdown.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1] ?? ''
-        const date = scalar(frontmatter, 'lastVerified')
-        const timestamp = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? Date.parse(`${date}T00:00:00Z`) : NaN
-        if (!Number.isFinite(timestamp) || new Date(timestamp).toISOString().slice(0, 10) !== date) {
-          errors.push(`${source}: lastVerified must be a real YYYY-MM-DD date`)
-        }
-        if (scalar(frontmatter, 'verificationScope') !== 'docs') errors.push(`${source}: verificationScope must be docs`)
       }
       const built = source.replace(/\.md$/, '.html')
       if (!htmlPages.has(built)) errors.push(`Missing built tutorial: ${built}`)

@@ -186,18 +186,18 @@ export const sources: Array<{
     domestic: false
   },
   {
-    id: 'cxplay',
-    base: 'https://script.cx.ms/awavenue',
-    flat: true,
-    domestic: true
-  },
-  {
     id: 'uura',
     base: 'https://cdn.uura.cn/AWAvenue',
     flat: true,
     domestic: true
   },
-  {
+    {
+    id: 'cxplay',
+    base: 'https://script.cx.ms/awavenue',
+    flat: true,
+    domestic: true
+  },
+{
     id: 'ghproxy',
     base: 'https://ghfast.top/https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main',
     flat: false,

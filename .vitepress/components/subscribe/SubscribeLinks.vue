@@ -1,630 +1,498 @@
 <template>
-  <section class="subscribe-wizard">
-    <header v-if="step !== 'result'" class="wizard-header">
-      <p class="eyebrow">{{ copy.eyebrow }}</p>
-      <h2>{{ copy.title }}</h2>
-      <p>{{ copy.intro }}</p>
-    </header>
+  <section class="sub">
+    <p class="sub-lede">{{ copy.lede }}</p>
 
-    <div class="wizard-shell">
-      <div v-if="step !== 'result'" class="progress" aria-hidden="true">
-        <span>{{ progressLabel }}</span>
-        <div class="progress-track">
-          <span :style="{ width: `${progressPercent}%` }"></span>
-        </div>
-      </div>
-
-      <div v-if="step === 'tool'" class="question-panel">
-        <div class="question-heading">
-          <p class="step-label">{{ copy.stepOne }}</p>
-          <h3>{{ copy.toolQuestion }}</h3>
-          <p>{{ copy.toolHelp }}</p>
+    <div class="sub-grid">
+      <!-- 左：选工具 -->
+      <div class="sub-tools" :class="{ collapsed: selectedTool && !pickerOpen }">
+        <div v-if="selectedTool" class="sub-current">
+          <span class="mark" :class="{ logo: icons[selectedTool.id] }">
+            <img v-if="icons[selectedTool.id]" :src="icons[selectedTool.id]" alt="" width="36" height="36" />
+            <template v-else>{{ marks[selectedTool.id] }}</template>
+          </span>
+          <strong>{{ selectedTool.label }}</strong>
+          <button type="button" @click="pickerOpen = true">{{ copy.changeTool }}</button>
         </div>
 
-        <label class="tool-search">
-          <span class="sr-only">{{ copy.searchLabel }}</span>
-          <input v-model="toolQuery" type="search" :placeholder="copy.searchPlaceholder" autocomplete="off" />
-        </label>
+        <div class="sub-picker">
+          <label class="sub-search">
+            <span class="sr-only">{{ copy.searchLabel }}</span>
+            <input v-model="toolQuery" type="search" :placeholder="copy.searchPlaceholder" autocomplete="off" />
+          </label>
 
-        <div v-for="group in visibleGroups" :key="group" class="tool-group">
-          <h4>{{ copy.groups[group] }}</h4>
-          <div class="tool-grid">
-            <button v-for="tool in filteredTools(group)" :key="tool.id" type="button" class="choice-card tool-card" @click="chooseTool(tool.id)">
-              <strong>{{ tool.label }}</strong>
-              <span>{{ tool.supportsVariants === false ? copy.independentRule : copy.fourProfiles }}</span>
-            </button>
+          <div v-for="group in visibleGroups" :key="group" class="tool-group">
+            <h3>{{ copy.groups[group] }}</h3>
+            <div class="tool-grid">
+              <button
+                v-for="tool in filteredTools(group)"
+                :key="tool.id"
+                type="button"
+                class="tool"
+                :class="{ active: tool.id === selectedToolId }"
+                :aria-pressed="tool.id === selectedToolId"
+                @click="chooseTool(tool.id)"
+              >
+                <span class="mark" :class="{ logo: icons[tool.id] }">
+                  <img v-if="icons[tool.id]" :src="icons[tool.id]" alt="" width="36" height="36" loading="lazy" decoding="async" />
+                  <template v-else>{{ marks[tool.id] }}</template>
+                </span>
+                <span class="name">{{ tool.label }}</span>
+                <span class="ext">{{ tool.extension }}</span>
+              </button>
+            </div>
           </div>
-        </div>
 
-        <p v-if="visibleGroups.length === 0" class="empty-state">{{ copy.noTools }}</p>
-      </div>
-
-      <div v-else-if="step === 'privacy'" class="question-panel narrow-panel">
-        <button class="back-button" type="button" @click="resetWizard">{{ copy.backToTools }}</button>
-        <div class="question-heading">
-          <p class="step-label">{{ copy.stepTwo }}</p>
-          <h3>{{ copy.privacyQuestion }}</h3>
-          <p>{{ copy.privacyHelp }}</p>
-        </div>
-        <div class="answer-grid">
-          <button type="button" class="choice-card answer-card recommended" @click="answerPrivacy(true)">
-            <span class="recommend-badge">{{ copy.recommended }}</span>
-            <strong>{{ copy.blockPrivacy }}</strong>
-            <span>{{ copy.blockPrivacyHelp }}</span>
-          </button>
-          <button type="button" class="choice-card answer-card" @click="answerPrivacy(false)">
-            <strong>{{ copy.keepPrivacy }}</strong>
-            <span>{{ copy.keepPrivacyHelp }}</span>
-          </button>
+          <p v-if="visibleGroups.length === 0" class="sub-empty">{{ copy.noTools }}</p>
         </div>
       </div>
 
-      <div v-else-if="step === 'unwelcome'" class="question-panel narrow-panel">
-        <button class="back-button" type="button" @click="goBackToPrivacy">{{ copy.previous }}</button>
-        <div class="question-heading">
-          <p class="step-label">{{ copy.stepThree }}</p>
-          <h3>{{ copy.unwelcomeQuestion }}</h3>
-          <p>{{ copy.unwelcomeHelp }}</p>
-        </div>
-        <div class="answer-grid">
-          <button type="button" class="choice-card answer-card recommended" @click="answerUnwelcome(true)">
-            <span class="recommend-badge">{{ copy.recommended }}</span>
-            <strong>{{ copy.blockUnwelcome }}</strong>
-            <span>{{ copy.blockUnwelcomeHelp }}</span>
-          </button>
-          <button type="button" class="choice-card answer-card" @click="answerUnwelcome(false)">
-            <strong>{{ copy.keepUnwelcome }}</strong>
-            <span>{{ copy.keepUnwelcomeHelp }}</span>
-          </button>
-        </div>
-      </div>
-
-      <div v-else-if="selectedTool" class="result-panel">
-        <div class="result-summary">
+      <!-- 右：结果，始终可见 -->
+      <aside ref="resultEl" class="sub-result" :aria-label="copy.resultLabel">
+        <header class="res-head">
           <div>
-            <p class="eyebrow">{{ copy.resultEyebrow }}</p>
-            <h2 ref="resultHeading" tabindex="-1">{{ selectedTool.label }} · {{ profileCopy.title }}</h2>
+            <p class="res-tool">{{ selectedTool ? selectedTool.label : copy.noToolYet }}</p>
+            <h2>
+              {{ profileTitle }}
+              <span v-if="allOn && !independent" class="sweep">{{ copy.sweep }}</span>
+            </h2>
           </div>
-          <button class="secondary-button" type="button" @click="editAnswers">{{ copy.changeAnswers }}</button>
-        </div>
+          <p v-if="!independent" class="res-count">
+            <b>{{ shownCount }}</b>
+            <span>{{ copy.rules }}</span>
+          </p>
+        </header>
 
-        <div v-if="recommendedLink" class="recommended-source">
-          <p class="recommended-source-label">{{ copy.recommendedSource }} · {{ copy.sources[recommendedLink.source.id].name }}</p>
-          <LinkContainer
-            :link="recommendedLink.link"
-            :copy-label="copy.copyLink"
-            :copied-label="copy.copied"
-            :copied-message="`${copy.copiedMessage}${copy.sources[recommendedLink.source.id].name}`"
-            :copy-error-label="copy.copyError"
-          />
-          <a class="tutorial-link" :href="tutorialLink">{{ copy.viewTutorial }}</a>
-        </div>
-
-        <ul v-if="selectedTool.supportsVariants !== false" class="coverage-list" :aria-label="copy.coverageLabel">
-          <li class="enabled">{{ copy.ads }}</li>
-          <li :class="{ enabled: blockPrivacy }">{{ copy.privacy }}</li>
-          <li :class="{ enabled: blockUnwelcome }">{{ copy.unwelcome }}</li>
-        </ul>
-
-        <p class="profile-description">{{ profileCopy.description }}</p>
-
-        <details class="more-sources">
-          <summary>{{ copy.moreSources }}</summary>
-          <div class="source-intro">
-            <h3>{{ copy.sourceTitle }}</h3>
-            <p>{{ copy.sourceIntro }}</p>
-            <div class="source-note">{{ copy.sameRuleNote }}</div>
-            <p class="result-filename">
-              {{ copy.filename }}：<code>{{ resultFilename }}</code>
-            </p>
+        <div v-if="!independent" class="cats">
+          <div class="cat on locked">
+            <span class="dot"></span>
+            <span class="cat-text">
+              <strong>{{ copy.ads }}</strong>
+              <small>{{ copy.adsHelp }}</small>
+            </span>
+            <span class="cat-num">{{ rules.ads }}</span>
+            <span class="track"><i></i></span>
           </div>
+          <button type="button" role="switch" class="cat" :class="{ on: blockPrivacy }" :aria-checked="blockPrivacy" @click="toggle('privacy')">
+            <span class="dot"></span>
+            <span class="cat-text">
+              <strong>{{ copy.privacy }}</strong>
+              <small>{{ copy.privacyHelp }}</small>
+            </span>
+            <span class="cat-num">{{ rules.privacy }}</span>
+            <span class="track"><i></i></span>
+          </button>
+          <button type="button" role="switch" class="cat" :class="{ on: blockUnwelcome }" :aria-checked="blockUnwelcome" @click="toggle('unwelcome')">
+            <span class="dot"></span>
+            <span class="cat-text">
+              <strong>{{ copy.unwelcome }}</strong>
+              <small>{{ copy.unwelcomeHelp }}</small>
+            </span>
+            <span class="cat-num">{{ rules.unwelcome }}</span>
+            <span class="track"><i></i></span>
+          </button>
+        </div>
+        <p v-else class="res-note">{{ copy.independentHelp }}</p>
 
-          <section v-if="domesticLinks.length" class="source-section">
-            <div class="source-section-heading">
-              <h4>{{ copy.domesticSources }}</h4>
-              <p>{{ copy.domesticSourcesHelp }}</p>
-            </div>
-            <div class="source-grid">
-              <article v-for="item in domesticLinks" :key="item.source.id" class="source-card domestic-card">
-                <div class="source-card-heading">
-                  <div>
-                    <h5>{{ copy.sources[item.source.id].name }}</h5>
-                    <p>{{ copy.sources[item.source.id].description }}</p>
-                  </div>
-                  <span class="source-badge">{{ copy.sources[item.source.id].badge }}</span>
-                </div>
-                <LinkContainer
-                  :link="item.link"
-                  :copy-label="copy.copyLink"
-                  :copied-label="copy.copied"
-                  :copied-message="`${copy.copiedMessage}${copy.sources[item.source.id].name}`"
-                  :copy-error-label="copy.copyError"
-                />
-              </article>
-            </div>
-          </section>
+        <template v-if="selectedTool && mainLink">
+          <p class="res-source">{{ copy.sources[mainLink.source.id].name }}</p>
+          <code class="res-url">{{ mainLink.link }}</code>
 
-          <section v-if="otherLinks.length" class="source-section">
-            <div class="source-section-heading">
-              <h4>{{ copy.otherSources }}</h4>
-              <p>{{ copy.otherSourcesHelp }}</p>
-            </div>
-            <div class="source-grid">
-              <article v-for="item in otherLinks" :key="item.source.id" class="source-card">
-                <div class="source-card-heading">
-                  <div>
-                    <h5>{{ copy.sources[item.source.id].name }}</h5>
-                    <p>{{ copy.sources[item.source.id].description }}</p>
-                  </div>
-                  <span class="source-badge">{{ copy.sources[item.source.id].badge }}</span>
-                </div>
-                <LinkContainer
-                  :link="item.link"
-                  :copy-label="copy.copyLink"
-                  :copied-label="copy.copied"
-                  :copied-message="`${copy.copiedMessage}${copy.sources[item.source.id].name}`"
-                  :copy-error-label="copy.copyError"
-                />
-              </article>
-            </div>
-          </section>
+          <div class="copy-wrap">
+            <button type="button" class="copy-main" :class="{ done: copiedKey === 'main' }" @click="copyLink(mainLink.link, 'main')">
+              {{ copiedKey === 'main' ? copy.copied : copy.copyLink }}
+            </button>
+            <span v-for="leaf in leaves" :key="leaf.id" class="leaf" :style="leaf.style" aria-hidden="true">
+              <svg viewBox="18 14 72 70"><path :d="leafPath" /></svg>
+            </span>
+          </div>
+          <p v-if="copyFailed" class="copy-error" role="alert">{{ copy.copyError }}</p>
+          <span class="sr-only" aria-live="polite">{{ copiedKey ? copy.copied : '' }}</span>
 
-          <p v-if="availableLinks.length < sources.length" class="availability-note">{{ copy.unavailableNote }}</p>
-        </details>
-      </div>
+          <a class="res-tutorial" :href="tutorialLink">{{ copy.viewTutorial }} →</a>
+
+          <details v-if="otherLinks.length" class="res-more">
+            <summary>{{ copy.moreSources }}</summary>
+            <ul>
+              <li v-for="item in otherLinks" :key="item.source.id">
+                <span class="src-name">
+                  {{ copy.sources[item.source.id].name }}
+                  <em>{{ copy.sources[item.source.id].badge }}</em>
+                </span>
+                <code :title="item.link">{{ item.link }}</code>
+                <button type="button" :class="{ done: copiedKey === item.source.id }" @click="copyLink(item.link, item.source.id)">
+                  {{ copiedKey === item.source.id ? copy.copied : copy.copyShort }}
+                </button>
+              </li>
+            </ul>
+          </details>
+        </template>
+        <p v-else class="res-placeholder">{{ copy.pickFirst }}</p>
+      </aside>
     </div>
 
-    <footer class="wizard-footer">
-      <p>{{ copy.footer }}</p>
-      <span class="footer-links">
-        <a :href="localePath('/Protocol.html')">{{ copy.protocol }}</a>
-        <a :href="localePath('/Support.html')">{{ copy.feedback }}</a>
-      </span>
+    <footer class="sub-footer">
+      <a :href="localePath('/Protocol.html')">{{ copy.protocol }}</a>
+      <a :href="localePath('/Support.html')">{{ copy.feedback }}</a>
     </footer>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useData } from 'vitepress'
-import { getFilename, getSubscriptionLink, getTool, getVariantId, sources, tools, type SourceId, type ToolGroup, type VariantId } from '../../../SubData'
-import LinkContainer from './linkContainer.vue'
+import { getSubscriptionLink, getTool, getVariantId, sources, tools, type SourceId, type ToolGroup, type VariantId } from '../../../SubData'
 import { tutorialMap } from '../../tutorials.mjs'
+import { data as rules } from '../../rules.data'
 
 type CopySet = {
-  eyebrow: string
-  title: string
-  intro: string
-  stepOne: string
-  stepTwo: string
-  stepThree: string
-  toolQuestion: string
-  toolHelp: string
+  lede: string
   searchLabel: string
   searchPlaceholder: string
   groups: Record<ToolGroup, string>
-  independentRule: string
-  fourProfiles: string
   noTools: string
-  backToTools: string
-  previous: string
-  privacyQuestion: string
-  privacyHelp: string
-  blockPrivacy: string
-  blockPrivacyHelp: string
-  keepPrivacy: string
-  keepPrivacyHelp: string
-  unwelcomeQuestion: string
-  unwelcomeHelp: string
-  blockUnwelcome: string
-  blockUnwelcomeHelp: string
-  keepUnwelcome: string
-  keepUnwelcomeHelp: string
-  recommended: string
-  resultEyebrow: string
-  changeAnswers: string
-  coverageLabel: string
+  changeTool: string
+  resultLabel: string
+  noToolYet: string
+  pickFirst: string
+  sweep: string
+  rules: string
   ads: string
+  adsHelp: string
   privacy: string
+  privacyHelp: string
   unwelcome: string
-  viewTutorial: string
-  recommendedSource: string
-  moreSources: string
-  copyError: string
-  filename: string
-  sourceTitle: string
-  sourceIntro: string
-  sameRuleNote: string
-  domesticSources: string
-  domesticSourcesHelp: string
-  otherSources: string
-  otherSourcesHelp: string
+  unwelcomeHelp: string
+  independentHelp: string
   copyLink: string
+  copyShort: string
   copied: string
-  copiedMessage: string
-  unavailableNote: string
-  footer: string
+  copyError: string
+  viewTutorial: string
+  moreSources: string
   protocol: string
   feedback: string
-  profiles: Record<VariantId | 'independent', { title: string; description: string }>
-  sources: Record<SourceId, { name: string; description: string; badge: string }>
+  profiles: Record<VariantId | 'independent', string>
+  sources: Record<SourceId, { name: string; badge: string }>
 }
 
 const copySets: Record<string, CopySet> = {
   'zh-CN': {
-    eyebrow: '互动式订阅生成器',
-    title: '回答三个问题，生成适合你的订阅',
-    intro: '不需要先弄懂文件名和规则语法。告诉我们你使用的工具和希望拦截的内容即可。',
-    stepOne: '第 1 / 3 步',
-    stepTwo: '第 2 / 3 步',
-    stepThree: '第 3 / 3 步',
-    toolQuestion: '你正在使用什么工具？',
-    toolHelp: '选择你准备导入秋风广告规则的应用、代理客户端或 DNS 服务。',
+    lede: '选工具，拨开关，复制链接。',
     searchLabel: '搜索工具',
     searchPlaceholder: '搜索 AdGuard、Clash、Surge……',
-    groups: { popular: '常用工具', proxy: '代理客户端与格式', dns: 'DNS、路由器与 hosts', advanced: '进阶与独立规则' },
-    independentRule: '独立规则，不参与四种方案',
-    fourProfiles: '支持四种拦截方案',
-    noTools: '没有找到匹配的工具，可以换个关键词试试。',
-    backToTools: '← 重新选择工具',
-    previous: '← 上一步',
-    privacyQuestion: '是否拦截隐私统计与遥测？',
-    privacyHelp: '包括统计埋点、遥测、崩溃收集和设备指纹。拦截后隐私更强，但少数功能可能受影响。',
-    blockPrivacy: '拦截，减少追踪',
-    blockPrivacyHelp: '加入隐私类规则，降低统计、遥测与设备指纹请求。',
-    keepPrivacy: '保留，兼容优先',
-    keepPrivacyHelp: '不加入隐私类规则，仅处理其他已选择的内容。',
-    unwelcomeQuestion: '是否拦截不受欢迎的网络行为？',
-    unwelcomeHelp: '包括强制更新、P2P/PCDN、推送和云控下发。请根据你的设备用途选择。',
-    blockUnwelcome: '拦截，干预更强',
-    blockUnwelcomeHelp: '加入不受欢迎类规则，减少强更、PCDN、推送和云控请求。',
-    keepUnwelcome: '保留，减少影响',
-    keepUnwelcomeHelp: '不加入不受欢迎类规则，保留这些连接。',
-    recommended: '推荐',
-    resultEyebrow: '你的订阅方案',
-    changeAnswers: '修改选择',
-    coverageLabel: '方案包含内容',
+    groups: { popular: '常用', proxy: '代理客户端', dns: 'DNS、路由器与 hosts', advanced: '其他格式' },
+    noTools: '没搜到。它要是个广告，我们早拦了。',
+    changeTool: '换一个',
+    resultLabel: '订阅链接',
+    noToolYet: '还没选工具',
+    pickFirst: '先选一个工具，订阅链接会出现在这里。',
+    sweep: '秋风扫落叶',
+    rules: '条规则',
     ads: '广告',
-    privacy: '隐私与遥测',
-    unwelcome: '强更、PCDN、推送与云控',
-    viewTutorial: '查看导入教程',
-    recommendedSource: '推荐来源',
-    moreSources: '更多来源与方案说明',
-    copyError: '复制失败，请长按或选中上方链接手动复制。',
-    filename: '技术文件名',
-    sourceTitle: '选择订阅源并一键复制',
-    sourceIntro:
-      '优先推荐规则仓库的 GitHub Raw 源，可选择本项目提供的格式与方案，无需等待第三方镜像另行同步。下载速度取决于网络；无法连接时可改用 jsDelivr 或其他备用源，CDN 缓存可能延迟更新。',
-    sameRuleNote: '各来源分发秋风广告规则，但镜像同步和缓存可能导致内容版本不同。更换来源后，请检查下载是否成功及规则更新时间。',
-    domesticSources: '社区镜像',
-    domesticSourcesHelp: '由第三方维护，访问速度和内容新鲜度请分别确认。',
-    otherSources: 'CDN 与代理备用',
-    otherSourcesHelp: '官方仓库源无法连接时可尝试以下线路，使用后仍需核对规则更新时间。',
+    adsHelp: '投放、竞价、素材、监测归因',
+    privacy: '隐私',
+    privacyHelp: '统计埋点、遥测、崩溃收集、设备指纹',
+    unwelcome: '不受欢迎',
+    unwelcomeHelp: '强制更新、P2P/PCDN、推送、云控下发',
+    independentHelp: '补充规则不分三类，单独订阅。',
     copyLink: '复制订阅链接',
+    copyShort: '复制',
     copied: '已复制',
-    copiedMessage: '已复制：',
-    unavailableNote: '当前格式有少量镜像尚未提供，因此仅展示确认可用的线路。',
-    footer: '订阅前请阅读使用说明与许可；遇到误杀、漏拦或链接故障，欢迎反馈。',
+    copyError: '复制失败，请长按或选中上面的链接手动复制。',
+    viewTutorial: '导入教程',
+    moreSources: '连不上 GitHub？换个来源',
     protocol: '使用说明与许可',
-    feedback: '反馈渠道',
-    profiles: {
-      full: { title: '完整防护', description: '同时拦截广告、隐私追踪与不受欢迎的网络行为，保持秋风广告规则的默认完整体验。' },
-      ads: { title: '纯广告', description: '只拦截广告相关请求，干预最少，适合更重视功能兼容的环境。' },
-      noPrivacy: { title: '广告＋不受欢迎', description: '拦截广告、强更、PCDN、推送与云控，不拦截隐私统计与遥测。' },
-      noUnwelcome: { title: '广告＋隐私', description: '拦截广告、统计遥测与设备指纹，保留强更、PCDN、推送和云控连接。' },
-      independent: { title: '独立规则', description: '这个格式目前不参与四种分类方案，下面提供它现有的独立订阅。' }
-    },
+    feedback: '反馈误杀或漏拦',
+    profiles: { full: '完整防护', ads: '纯广告', noPrivacy: '广告＋不受欢迎', noUnwelcome: '广告＋隐私', independent: '独立规则' },
     sources: {
-      cxplay: { name: 'CXPLAY 镜像', description: '社区提供的订阅镜像，无法直连 GitHub 时可尝试此来源。', badge: '社区镜像' },
-      uura: { name: '王富贵镜像', description: '2026-10-26 检查发现部分格式内容落后于官方，另有压缩响应兼容问题；使用前请核对。', badge: '注意更新与兼容性' },
-      ghraw: {
-        name: 'GitHub Raw · 官方仓库',
-        description: '直接订阅秋风广告规则仓库的发布文件，无需第三方镜像另行同步；下载速度和可用性取决于网络。',
-        badge: '官方仓库'
-      },
-      jsdelivr: { name: 'jsDelivr', description: '官方仓库连接受限时可尝试的 CDN 备用源，缓存可能导致更新延迟。', badge: 'CDN 备用' },
-      ghproxy: { name: 'ghproxy', description: 'GitHub 反向代理，服务可用性与内容更新需分别核对。', badge: '备用线路' }
+      ghraw: { name: 'GitHub Raw · 官方仓库', badge: '官方' },
+      uura: { name: '王富贵镜像', badge: '国内推荐' },
+      cxplay: { name: 'CXPLAY 镜像', badge: '社区镜像' },
+      jsdelivr: { name: 'jsDelivr', badge: 'CDN，可能晚几小时' },
+      ghproxy: { name: 'ghproxy', badge: 'GitHub 代理' }
     }
   },
   'zh-TW': {
-    eyebrow: '互動式訂閱產生器',
-    title: '回答三個問題，產生適合你的訂閱',
-    intro: '不需要先弄懂檔案名稱和規則語法。告訴我們你使用的工具和希望攔截的內容即可。',
-    stepOne: '第 1 / 3 步',
-    stepTwo: '第 2 / 3 步',
-    stepThree: '第 3 / 3 步',
-    toolQuestion: '你正在使用什麼工具？',
-    toolHelp: '選擇你準備匯入秋風廣告規則的應用程式、代理用戶端或 DNS 服務。',
+    lede: '選工具，撥開關，複製連結。',
     searchLabel: '搜尋工具',
     searchPlaceholder: '搜尋 AdGuard、Clash、Surge……',
-    groups: { popular: '常用工具', proxy: '代理用戶端與格式', dns: 'DNS、路由器與 hosts', advanced: '進階與獨立規則' },
-    independentRule: '獨立規則，不參與四種方案',
-    fourProfiles: '支援四種攔截方案',
-    noTools: '找不到符合的工具，可以換個關鍵字試試。',
-    backToTools: '← 重新選擇工具',
-    previous: '← 上一步',
-    privacyQuestion: '是否攔截使用情況統計與遙測？',
-    privacyHelp: '包括使用情況統計、遙測、當機回報與裝置指紋。攔截後可加強隱私權保護，但少數功能可能受影響。',
-    blockPrivacy: '攔截，減少追蹤',
-    blockPrivacyHelp: '加入隱私權保護規則，降低統計、遙測與裝置指紋請求。',
-    keepPrivacy: '保留，相容優先',
-    keepPrivacyHelp: '不加入隱私權保護規則，只處理其他已選擇的內容。',
-    unwelcomeQuestion: '是否攔截不受歡迎的網路行為？',
-    unwelcomeHelp: '包括強制更新、P2P/PCDN、推播和雲端設定派送。請依照裝置用途選擇。',
-    blockUnwelcome: '攔截，干預更強',
-    blockUnwelcomeHelp: '加入不受歡迎類規則，減少強制更新、PCDN、推播和雲端控制請求。',
-    keepUnwelcome: '保留，減少影響',
-    keepUnwelcomeHelp: '不加入不受歡迎類規則，保留這些連線。',
-    recommended: '推薦',
-    resultEyebrow: '你的訂閱方案',
-    changeAnswers: '修改選擇',
-    coverageLabel: '方案包含內容',
+    groups: { popular: '常用', proxy: '代理用戶端', dns: 'DNS、路由器與 hosts', advanced: '其他格式' },
+    noTools: '沒搜到。它要是廣告，我們早就攔了。',
+    changeTool: '換一個',
+    resultLabel: '訂閱連結',
+    noToolYet: '還沒選工具',
+    pickFirst: '先選一個工具，訂閱連結會出現在這裡。',
+    sweep: '秋風掃落葉',
+    rules: '條規則',
     ads: '廣告',
-    privacy: '隱私權與遙測',
-    unwelcome: '強制更新、PCDN、推播與雲端控制',
-    viewTutorial: '查看匯入教學',
-    recommendedSource: '推薦來源',
-    moreSources: '更多來源與方案說明',
-    copyError: '複製失敗，請長按或選取上方連結手動複製。',
-    filename: '規則檔名',
-    sourceTitle: '選擇其他訂閱來源',
-    sourceIntro:
-      '優先推薦規則儲存庫的 GitHub Raw 來源，可選擇本專案提供的格式與方案，不必等待第三方鏡像站另外同步。下載速度取決於網路；無法連線時可改用 jsDelivr 或其他備用來源，CDN 快取可能延後更新。',
-    sameRuleNote: '各來源皆提供秋風廣告規則，但鏡像同步與快取可能造成版本不同。更換來源後，請確認下載成功，並檢查規則更新時間。',
-    domesticSources: '社群鏡像站',
-    domesticSourcesHelp: '由第三方維護，請分別確認連線速度與內容是否為最新版本。',
-    otherSources: 'CDN 與代理備用來源',
-    otherSourcesHelp: '官方儲存庫來源無法連線時，可嘗試以下來源，使用後仍須確認規則更新時間。',
+    adsHelp: '投放、競價、素材、成效歸因',
+    privacy: '隱私權',
+    privacyHelp: '使用統計、遙測、當機回報、裝置指紋',
+    unwelcome: '不受歡迎',
+    unwelcomeHelp: '強制更新、P2P/PCDN、推播、雲端控制',
+    independentHelp: '補充規則不分三類，單獨訂閱。',
     copyLink: '複製訂閱連結',
+    copyShort: '複製',
     copied: '已複製',
-    copiedMessage: '已複製：',
-    unavailableNote: '目前格式有少量鏡像尚未提供，因此只顯示已設定的來源。',
-    footer: '訂閱前請閱讀使用說明與授權；遇到誤擋、漏攔或連結故障，歡迎回報。',
+    copyError: '複製失敗，請長按或選取上面的連結手動複製。',
+    viewTutorial: '匯入教學',
+    moreSources: '連不上 GitHub？換個來源',
     protocol: '使用說明與授權',
-    feedback: '回報管道',
-    profiles: {
-      full: { title: '完整防護', description: '同時攔截廣告、追蹤行為與不受歡迎的網路行為，保留秋風廣告規則的預設完整體驗。' },
-      ads: { title: '純廣告', description: '只攔截廣告相關請求，干預最少，適合更重視功能相容的環境。' },
-      noPrivacy: { title: '廣告＋不受歡迎', description: '攔截廣告、強制更新、PCDN、推播與雲端控制，不攔截使用情況統計與遙測。' },
-      noUnwelcome: { title: '廣告＋隱私權保護', description: '攔截廣告、統計遙測與裝置指紋，保留強制更新、PCDN、推播和雲端控制連線。' },
-      independent: { title: '獨立規則', description: '此格式目前不參與四種分類方案，這裡提供既有的獨立訂閱。' }
-    },
+    feedback: '回報誤擋或漏攔',
+    profiles: { full: '完整防護', ads: '純廣告', noPrivacy: '廣告＋不受歡迎', noUnwelcome: '廣告＋隱私權', independent: '獨立規則' },
     sources: {
-      cxplay: { name: 'CXPLAY 鏡像', description: '社群提供的訂閱鏡像站，無法直接連線至 GitHub 時可嘗試此來源。', badge: '社群鏡像站' },
-      uura: { name: '王富貴鏡像', description: '2026-10-26 檢查發現部分格式尚未跟上官方更新，另有壓縮回應相容性問題；使用前請先核對。', badge: '注意更新與相容性' },
-      ghraw: {
-        name: 'GitHub Raw · 官方儲存庫',
-        description: '直接訂閱秋風廣告規則儲存庫的發布檔案，不必等待第三方鏡像站另外同步；下載速度與可用性取決於網路。',
-        badge: '官方儲存庫'
-      },
-      jsdelivr: { name: 'jsDelivr', description: '官方儲存庫連線受限時可嘗試的 CDN 備用來源，快取可能造成更新延遲。', badge: 'CDN 備用' },
-      ghproxy: { name: 'ghproxy', description: 'GitHub 反向代理，服務可用性與內容更新須分別核對。', badge: '備用線路' }
+      ghraw: { name: 'GitHub Raw · 官方儲存庫', badge: '官方' },
+      uura: { name: '王富貴鏡像', badge: '中國大陸推薦' },
+      cxplay: { name: 'CXPLAY 鏡像', badge: '社群鏡像站' },
+      jsdelivr: { name: 'jsDelivr', badge: 'CDN，可能晚幾小時' },
+      ghproxy: { name: 'ghproxy', badge: 'GitHub 代理' }
     }
   },
   'en-US': {
-    eyebrow: 'Interactive subscription builder',
-    title: 'Answer three questions to build your subscription',
-    intro: 'You do not need to understand filenames or rule syntax first. Choose your tool and what you want to block.',
-    stepOne: 'Step 1 of 3',
-    stepTwo: 'Step 2 of 3',
-    stepThree: 'Step 3 of 3',
-    toolQuestion: 'Which tool are you using?',
-    toolHelp: 'Choose the app, proxy client, DNS service, or format that will import AWAvenue Ads Rule.',
+    lede: 'Pick a tool, flip the switches, copy the link.',
     searchLabel: 'Search tools',
     searchPlaceholder: 'Search AdGuard, Clash, Surge…',
-    groups: { popular: 'Popular tools', proxy: 'Proxy clients and formats', dns: 'DNS, routers, and hosts', advanced: 'Advanced and standalone rules' },
-    independentRule: 'Standalone rule without four profiles',
-    fourProfiles: 'Supports all four blocking profiles',
-    noTools: 'No matching tool found. Try another keyword.',
-    backToTools: '← Choose another tool',
-    previous: '← Previous',
-    privacyQuestion: 'Block analytics and privacy telemetry?',
-    privacyHelp: 'This includes analytics, telemetry, crash reporting, and device fingerprinting. Blocking improves privacy but may affect a few features.',
-    blockPrivacy: 'Block for stronger privacy',
-    blockPrivacyHelp: 'Include the privacy category to reduce analytics, telemetry, and fingerprint requests.',
-    keepPrivacy: 'Keep for compatibility',
-    keepPrivacyHelp: 'Do not include the privacy category; only block the other content you select.',
-    unwelcomeQuestion: 'Block unwanted network behavior?',
-    unwelcomeHelp: 'This includes forced updates, P2P/PCDN, push services, and remote configuration.',
-    blockUnwelcome: 'Block for stronger control',
-    blockUnwelcomeHelp: 'Include the unwanted category to reduce forced updates, PCDN, push, and remote-control requests.',
-    keepUnwelcome: 'Keep to reduce impact',
-    keepUnwelcomeHelp: 'Do not include the unwanted category and preserve these connections.',
-    recommended: 'Recommended',
-    resultEyebrow: 'Your subscription profile',
-    changeAnswers: 'Change answers',
-    coverageLabel: 'Included categories',
-    ads: 'Advertising',
-    privacy: 'Privacy and telemetry',
-    unwelcome: 'Forced updates, PCDN, push, and remote control',
-    viewTutorial: 'View import guide',
-    recommendedSource: 'Recommended source',
-    moreSources: 'More sources and profile details',
-    copyError: 'Copy failed. Select or long-press the link above to copy it manually.',
-    filename: 'Technical filename',
-    sourceTitle: 'Choose a source and copy',
-    sourceIntro:
-      'GitHub Raw from the rule repository is recommended first. Choose the formats and profiles published by this project without waiting for a third-party mirror to synchronize. Download speed depends on your network; try jsDelivr or another fallback if GitHub is unreachable. CDN caching may delay updates.',
-    sameRuleNote:
-      'Sources distribute AWAvenue Ads Rule, but mirror synchronization and caches can serve different versions. Check download success and the rule update time after switching.',
-    domesticSources: 'Community mirrors',
-    domesticSourcesHelp: 'Maintained by third parties. Check both connectivity and content freshness.',
-    otherSources: 'CDN and proxy fallbacks',
-    otherSourcesHelp: 'Try these when the official repository source is unreachable, then check the rule update time.',
-    copyLink: 'Copy subscription',
+    groups: { popular: 'Popular', proxy: 'Proxy clients', dns: 'DNS, routers, and hosts', advanced: 'Other formats' },
+    noTools: 'Nothing here. If it were an ad, we would have blocked it already.',
+    changeTool: 'Change',
+    resultLabel: 'Subscription link',
+    noToolYet: 'No tool selected',
+    pickFirst: 'Pick a tool and the subscription link shows up here.',
+    sweep: 'clean sweep',
+    rules: 'rules',
+    ads: 'Ads',
+    adsHelp: 'Ad serving, bidding, creatives, attribution',
+    privacy: 'Privacy',
+    privacyHelp: 'Analytics, telemetry, crash reports, fingerprinting',
+    unwelcome: 'Unwanted',
+    unwelcomeHelp: 'Forced updates, P2P/PCDN, push, remote config',
+    independentHelp: 'The supplementary list is not split into categories; it has a single subscription.',
+    copyLink: 'Copy subscription link',
+    copyShort: 'Copy',
     copied: 'Copied',
-    copiedMessage: 'Copied: ',
-    unavailableNote: 'A few mirrors do not provide this format, so only confirmed working sources are shown.',
-    footer: 'Read the usage and licensing information before subscribing. Reports of false positives, missed ads, and broken links are welcome.',
+    copyError: 'Copy failed. Select or long-press the link above to copy it manually.',
+    viewTutorial: 'Import guide',
+    moreSources: 'GitHub unreachable? Try another source',
     protocol: 'Usage and licensing',
-    feedback: 'Support channels',
-    profiles: {
-      full: {
-        title: 'Full protection',
-        description: 'Blocks advertising, privacy tracking, and unwanted network behavior—the complete default AWAvenue Ads Rule experience.'
-      },
-      ads: { title: 'Ads only', description: 'Blocks advertising requests only, with the least intervention for compatibility-first environments.' },
-      noPrivacy: { title: 'Ads + unwanted', description: 'Blocks ads, forced updates, PCDN, push, and remote control, while keeping analytics and telemetry.' },
-      noUnwelcome: {
-        title: 'Ads + privacy',
-        description: 'Blocks ads, analytics, telemetry, and fingerprinting, while keeping forced updates, PCDN, push, and remote control.'
-      },
-      independent: {
-        title: 'Standalone rule',
-        description: 'This format does not currently participate in the four profiles. Its existing standalone subscription is provided below.'
-      }
-    },
+    feedback: 'Report a false positive or a miss',
+    profiles: { full: 'Full protection', ads: 'Ads only', noPrivacy: 'Ads + unwanted', noUnwelcome: 'Ads + privacy', independent: 'Standalone list' },
     sources: {
-      cxplay: { name: 'CXPLAY Mirror', description: 'A community subscription mirror to try when GitHub cannot be reached directly.', badge: 'Community mirror' },
-      uura: {
-        name: 'Uura Mirror',
-        description: 'Checks on 2026-10-26 found outdated content in some formats and compression compatibility issues. Verify before use.',
-        badge: 'Check updates and compatibility'
-      },
-      ghraw: {
-        name: 'GitHub Raw · Official repository',
-        description:
-          'Subscribe directly to files published in the AWAvenue-Ads-Rule repository, without a third-party mirror synchronization step. Download speed and availability depend on your network.',
-        badge: 'Official repository'
-      },
-      jsdelivr: {
-        name: 'jsDelivr',
-        description: 'A CDN fallback when the official repository cannot be reached; caching may delay updates.',
-        badge: 'CDN fallback'
-      },
-      ghproxy: { name: 'ghproxy', description: 'A GitHub proxy; check availability and content updates separately.', badge: 'Fallback' }
+      ghraw: { name: 'GitHub Raw · Official repository', badge: 'Official' },
+      uura: { name: 'Uura mirror', badge: 'Best in mainland China' },
+      cxplay: { name: 'CXPLAY mirror', badge: 'Community mirror' },
+      jsdelivr: { name: 'jsDelivr', badge: 'CDN, may lag a few hours' },
+      ghproxy: { name: 'ghproxy', badge: 'GitHub proxy' }
     }
   }
 }
+
+// 工具卡左侧的图标：有官方 logo 的用 public/tools/ 里的小图（每个 0.4–1.7 KB），其余用字母标
+const icons: Record<string, string> = {
+  adguard: '/tools/adguard.svg',
+  adguardReplenish: '/tools/adguard.svg',
+  clashClassical: '/tools/mihomo.webp',
+  clashMrs: '/tools/mihomo.webp',
+  clash: '/tools/mihomo.webp',
+  quantumultX: '/tools/quantumultx.webp',
+  shadowrocket: '/tools/shadowrocket.webp',
+  loon: '/tools/loon.webp',
+  surgeRuleSet: '/tools/surge.webp',
+  surgeDomainSet: '/tools/surge.webp',
+  surgeModule: '/tools/surge.webp',
+  singbox: '/tools/singbox.webp',
+  hosts: '/tools/adaway.webp',
+  routerosAdlist: '/tools/mikrotik.svg',
+  routeros: '/tools/mikrotik.svg',
+  adclose: '/tools/adclose.svg'
+}
+
+const marks: Record<string, string> = {
+  adguard: 'AG',
+  clashClassical: 'CM',
+  clashMrs: 'CM',
+  clash: 'CM',
+  quantumultX: 'QX',
+  shadowrocket: 'SR',
+  loon: 'Lo',
+  surgeRuleSet: 'Su',
+  surgeDomainSet: 'Su',
+  surgeModule: 'Su',
+  singbox: 'sb',
+  hosts: 'h',
+  dnsmasq: 'dm',
+  mosdns: 'Mo',
+  smartdns: 'SD',
+  routerosAdlist: 'RO',
+  routeros: 'RO',
+  adclose: 'AC',
+  geosite: 'Geo',
+  adguardReplenish: 'AG+'
+}
+
+const leafPath =
+  'M45 61.5 23.3 56.6 36.4 54.7 24.8 43.4C27.5 42.6 29.3 41 29.5 38 29.8 33.5 27.6 30 25.8 26.7 30 30 35.5 34.6 39.6 33.2 41.3 32.6 41.8 31.4 42.3 30.2L48 39 54 24.2C56.5 27.2 61 27.6 65 23.6L69.3 18.7C68 23.2 66.6 28.6 68.3 31.8 69.4 33.6 71 34 73 34.2L62.7 47.3 73 47.5C71.2 50 71.3 52 74 53.8L84.5 60.3C79 61.5 73.4 63 71.8 66.6L70.8 69.3 55 65.3 59.3 76Z'
+
+const storageKey = 'awa-sub-tool'
 
 const { lang } = useData()
 const copy = computed(() => copySets[lang.value] || copySets['zh-CN'])
 
 const toolQuery = ref('')
 const selectedToolId = ref('')
-const blockPrivacy = ref<boolean | null>(null)
-const blockUnwelcome = ref<boolean | null>(null)
+const blockPrivacy = ref(true)
+const blockUnwelcome = ref(true)
+const pickerOpen = ref(true)
+const resultEl = ref<HTMLElement | null>(null)
 
 const selectedTool = computed(() => getTool(selectedToolId.value))
-const step = computed<'tool' | 'privacy' | 'unwelcome' | 'result'>(() => {
-  if (!selectedTool.value) return 'tool'
-  if (selectedTool.value.supportsVariants === false) return 'result'
-  if (blockPrivacy.value === null) return 'privacy'
-  if (blockUnwelcome.value === null) return 'unwelcome'
-  return 'result'
-})
-
-const progressPercent = computed(() => ({ tool: 33, privacy: 66, unwelcome: 100, result: 100 })[step.value])
-const progressLabel = computed(() => ({ tool: copy.value.stepOne, privacy: copy.value.stepTwo, unwelcome: copy.value.stepThree, result: '' })[step.value])
+const independent = computed(() => selectedTool.value?.supportsVariants === false)
+const allOn = computed(() => blockPrivacy.value && blockUnwelcome.value)
 
 const visibleGroups = computed(() => (['popular', 'proxy', 'dns', 'advanced'] as ToolGroup[]).filter(group => filteredTools(group).length > 0))
 
 function filteredTools(group: ToolGroup) {
   const query = toolQuery.value.trim().toLocaleLowerCase()
-  return tools.filter(tool => tool.group === group && (!query || tool.label.toLocaleLowerCase().includes(query)))
+  return tools.filter(tool => tool.group === group && (!query || `${tool.label} ${tool.extension}`.toLocaleLowerCase().includes(query)))
 }
 
-const variantId = computed<VariantId>(() => {
-  if (selectedTool.value?.supportsVariants === false) return 'full'
-  return getVariantId(Boolean(blockPrivacy.value), Boolean(blockUnwelcome.value))
-})
-
-const profileCopy = computed(() => (selectedTool.value?.supportsVariants === false ? copy.value.profiles.independent : copy.value.profiles[variantId.value]))
-
-const resultFilename = computed(() => (selectedTool.value ? getFilename(selectedTool.value, variantId.value) : ''))
+const variantId = computed<VariantId>(() => (independent.value ? 'full' : getVariantId(blockPrivacy.value, blockUnwelcome.value)))
+const profileTitle = computed(() => copy.value.profiles[independent.value ? 'independent' : variantId.value])
 
 const availableLinks = computed(() => {
-  if (!selectedTool.value) return []
-  return sources
-    .map(source => ({
-      source,
-      link: getSubscriptionLink(selectedTool.value!, variantId.value, source.id)
-    }))
-    .filter(item => item.link)
+  const tool = selectedTool.value
+  if (!tool) return []
+  return sources.map(source => ({ source, link: getSubscriptionLink(tool, variantId.value, source.id) })).filter(item => item.link)
+})
+const mainLink = computed(() => availableLinks.value[0])
+// 备用来源：国内镜像排前面
+const otherLinks = computed(() => {
+  const rest = availableLinks.value.slice(1)
+  return [...rest.filter(item => item.source.domestic), ...rest.filter(item => !item.source.domestic)]
 })
 
-const recommendedLink = computed(() => availableLinks.value[0])
-const alternativeLinks = computed(() => availableLinks.value.slice(1))
-const domesticLinks = computed(() => alternativeLinks.value.filter(item => item.source.domestic))
-const otherLinks = computed(() => alternativeLinks.value.filter(item => !item.source.domestic))
-
-const resultHeading = ref<HTMLHeadingElement | null>(null)
-watch(step, async value => {
-  if (value !== 'result') return
-  await nextTick()
-  resultHeading.value?.focus({ preventScroll: true })
-  resultHeading.value?.scrollIntoView({ block: 'start' })
-})
-
-const tutorialLink = computed(() => {
-  return localePath(tutorialMap[selectedToolId.value as keyof typeof tutorialMap] || '/Knowledge.html')
-})
+const tutorialLink = computed(() => localePath(tutorialMap[selectedToolId.value as keyof typeof tutorialMap] || '/Knowledge.html'))
 
 function localePath(path: string) {
   const prefix = lang.value === 'en-US' ? '/en' : lang.value === 'zh-TW' ? '/zh_TW' : ''
   return `${prefix}${path}`
 }
 
-function chooseTool(toolId: string) {
-  selectedToolId.value = toolId
-  blockPrivacy.value = null
-  blockUnwelcome.value = null
-  persistState()
-}
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-function answerPrivacy(value: boolean) {
-  blockPrivacy.value = value
-  blockUnwelcome.value = null
-  persistState()
-}
-
-function answerUnwelcome(value: boolean) {
-  blockUnwelcome.value = value
-  persistState()
-}
-
-function resetWizard() {
-  selectedToolId.value = ''
-  blockPrivacy.value = null
-  blockUnwelcome.value = null
-  persistState()
-}
-
-function goBackToPrivacy() {
-  blockPrivacy.value = null
-  blockUnwelcome.value = null
-  persistState()
-}
-
-function editAnswers() {
-  if (selectedTool.value?.supportsVariants === false) {
-    resetWizard()
+// 规则数量：拨开关时滚动到新值
+const total = computed(() => rules.ads + (blockPrivacy.value ? rules.privacy : 0) + (blockUnwelcome.value ? rules.unwelcome : 0))
+const shownCount = ref(total.value)
+let rollFrame = 0
+watch(total, target => {
+  cancelAnimationFrame(rollFrame)
+  if (reducedMotion()) {
+    shownCount.value = target
     return
   }
-  blockUnwelcome.value = null
+  const from = shownCount.value
+  const start = performance.now()
+  const step = (now: number) => {
+    const t = Math.min(1, (now - start) / 420)
+    shownCount.value = Math.round(from + (target - from) * (1 - (1 - t) ** 3))
+    if (t < 1) rollFrame = requestAnimationFrame(step)
+  }
+  rollFrame = requestAnimationFrame(step)
+})
+
+function chooseTool(toolId: string) {
+  selectedToolId.value = toolId
+  pickerOpen.value = false
+  persistState()
+  // 窄屏下工具列表收起后，把结果带回视野
+  if (window.matchMedia('(max-width: 859px)').matches) {
+    requestAnimationFrame(() => resultEl.value?.closest('.sub')?.scrollIntoView({ block: 'start' }))
+  }
+}
+
+function toggle(kind: 'privacy' | 'unwelcome') {
+  if (kind === 'privacy') blockPrivacy.value = !blockPrivacy.value
+  else blockUnwelcome.value = !blockUnwelcome.value
   persistState()
 }
 
 function persistState() {
-  if (typeof window === 'undefined') return
   const params = new URLSearchParams()
   if (selectedToolId.value) params.set('tool', selectedToolId.value)
-  if (blockPrivacy.value !== null) params.set('privacy', blockPrivacy.value ? 'block' : 'keep')
-  if (blockUnwelcome.value !== null) params.set('unwelcome', blockUnwelcome.value ? 'block' : 'keep')
+  if (!blockPrivacy.value) params.set('privacy', 'keep')
+  if (!blockUnwelcome.value) params.set('unwelcome', 'keep')
   const query = params.toString()
   window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`)
+  try {
+    localStorage.setItem(storageKey, selectedToolId.value)
+  } catch {}
+}
+
+// 复制
+const copiedKey = ref('')
+const copyFailed = ref(false)
+let copiedTimer: ReturnType<typeof setTimeout> | undefined
+
+async function copyLink(link: string, key: string) {
+  copyFailed.value = false
+  try {
+    await navigator.clipboard.writeText(link)
+  } catch {
+    copyFailed.value = true
+    return
+  }
+  copiedKey.value = key
+  clearTimeout(copiedTimer)
+  copiedTimer = setTimeout(() => (copiedKey.value = ''), 2000)
+  if (key === 'main') dropLeaves()
+}
+
+watch([selectedToolId, variantId], () => {
+  copiedKey.value = ''
+  copyFailed.value = false
+})
+
+// 复制成功：按钮处飘下几片小枫叶
+const leaves = ref<{ id: number; style: Record<string, string> }[]>([])
+let leafId = 0
+let leafTimer: ReturnType<typeof setTimeout> | undefined
+
+function dropLeaves() {
+  if (reducedMotion()) return
+  const tints = ['var(--awa-pink)', 'var(--awa-mauve)']
+  leaves.value = Array.from({ length: 4 }, (_, index) => ({
+    id: ++leafId,
+    style: {
+      left: `${12 + index * 22 + Math.random() * 10}%`,
+      color: tints[index % 2],
+      animationDelay: `${index * 90}ms`,
+      '--sway': `${Math.round(Math.random() * 40 - 20)}px`,
+      '--spin': `${Math.round(Math.random() * 240 - 120)}deg`
+    }
+  }))
+  clearTimeout(leafTimer)
+  leafTimer = setTimeout(() => (leaves.value = []), 1500)
 }
 
 onMounted(() => {
   const params = new URLSearchParams(window.location.search)
-  const toolId = params.get('tool')
-  if (toolId && getTool(toolId)) selectedToolId.value = toolId
+  let toolId = params.get('tool')
+  if (!toolId) {
+    try {
+      toolId = localStorage.getItem(storageKey)
+    } catch {}
+  }
+  if (toolId && getTool(toolId)) {
+    selectedToolId.value = toolId
+    pickerOpen.value = false
+  }
+  blockPrivacy.value = params.get('privacy') !== 'keep'
+  blockUnwelcome.value = params.get('unwelcome') !== 'keep'
+})
 
-  const privacy = params.get('privacy')
-  if (privacy === 'block' || privacy === 'keep') blockPrivacy.value = privacy === 'block'
-
-  const unwelcome = params.get('unwelcome')
-  if (unwelcome === 'block' || unwelcome === 'keep') blockUnwelcome.value = unwelcome === 'block'
+onUnmounted(() => {
+  cancelAnimationFrame(rollFrame)
+  clearTimeout(copiedTimer)
+  clearTimeout(leafTimer)
 })
 </script>
 
@@ -638,10 +506,7 @@ onMounted(() => {
   margin-inline: auto;
 }
 
-.subscription-page .container {
-  max-width: none;
-}
-
+.subscription-page .container,
 .subscription-page .content {
   max-width: none;
 }
@@ -650,434 +515,560 @@ onMounted(() => {
   max-width: 1180px;
 }
 
-.subscribe-wizard {
-  --wizard-border: color-mix(in srgb, var(--vp-c-brand-1) 18%, var(--vp-c-divider));
-  padding-bottom: 32px;
+.subscription-page .VPPage h1 {
+  margin-top: 40px;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 40px;
+  letter-spacing: -0.01em;
 }
 
-.wizard-header {
-  max-width: 780px;
-  margin-bottom: 28px;
+.sub {
+  scroll-margin-top: calc(var(--vp-nav-height) + 12px);
+  padding-bottom: 40px;
 }
 
-.wizard-header h2 {
-  margin: 4px 0 10px;
-  border: 0;
-  font-size: clamp(28px, 5vw, 42px);
-  line-height: 1.15;
-}
-
-.wizard-header > p:last-child {
+.sub-lede {
+  margin: 8px 0 28px;
   color: var(--vp-c-text-2);
   font-size: 17px;
 }
 
-.eyebrow,
-.step-label {
-  margin: 0;
-  color: var(--vp-c-brand-1);
-  font-size: 13px;
-  font-weight: 750;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.wizard-shell {
-  min-height: 440px;
-  border: 1px solid var(--wizard-border);
-  border-radius: 20px;
-  padding: clamp(20px, 4vw, 38px);
-  background: radial-gradient(circle at 100% 0, var(--vp-c-brand-soft), transparent 34%), var(--vp-c-bg-soft);
-}
-
-.progress {
+.sub-grid {
   display: grid;
-  grid-template-columns: auto minmax(120px, 260px);
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 32px;
-  color: var(--vp-c-text-2);
-  font-size: 13px;
-  font-weight: 650;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 384px);
+  align-items: start;
+  gap: 28px;
 }
 
-.progress-track {
-  height: 6px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--vp-c-divider);
+/* ---------- 工具 ---------- */
+
+.sub-current {
+  display: none;
 }
 
-.progress-track span {
+.sub-search {
   display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--vp-c-brand-1), var(--vp-c-brand-2));
-  transition: width 0.25s ease;
-}
-
-.question-heading {
-  max-width: 720px;
   margin-bottom: 24px;
 }
 
-.question-heading h3 {
-  margin: 6px 0 8px;
-  font-size: clamp(24px, 4vw, 34px);
-  line-height: 1.25;
-}
-
-.question-heading p:last-child {
-  margin: 0;
-  color: var(--vp-c-text-2);
-  font-size: 16px;
-}
-
-.narrow-panel {
-  max-width: 860px;
-  margin: 0 auto;
-}
-
-.back-button,
-.secondary-button {
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 9px;
-  padding: 8px 12px;
-  color: var(--vp-c-text-2);
-  background: var(--vp-c-bg);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.back-button {
-  margin-bottom: 22px;
-}
-
-.back-button:hover,
-.back-button:focus-visible,
-.secondary-button:hover,
-.secondary-button:focus-visible {
-  border-color: var(--vp-c-brand-1);
-  color: var(--vp-c-brand-1);
-}
-
-.tool-search {
-  display: block;
-  max-width: 600px;
-  margin-bottom: 28px;
-}
-
-.tool-search input {
+.sub-search input {
   width: 100%;
-  height: 48px;
+  height: 46px;
   border: 1px solid var(--vp-c-divider);
   border-radius: 12px;
   padding: 0 16px;
   color: var(--vp-c-text-1);
-  background: var(--vp-c-bg);
+  background: var(--vp-c-bg-soft);
   font: inherit;
   outline: none;
+  transition: border-color 0.2s;
 }
 
-.tool-search input:focus {
+.sub-search input:focus {
   border-color: var(--vp-c-brand-1);
-  box-shadow: 0 0 0 3px var(--vp-c-brand-soft);
 }
 
 .tool-group + .tool-group {
-  margin-top: 26px;
+  margin-top: 24px;
 }
 
-.tool-group h4,
-.source-section-heading h4 {
-  margin: 0 0 12px;
-  font-size: 16px;
+.sub .tool-group h3 {
+  margin: 0 0 10px;
+  color: var(--vp-c-text-2);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
 .tool-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
 }
 
-.choice-card {
-  position: relative;
+.tool {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
   border: 1px solid var(--vp-c-divider);
-  border-radius: 14px;
-  padding: 18px;
-  text-align: left;
+  border-radius: 12px;
+  padding: 10px 12px;
   color: var(--vp-c-text-1);
-  background: color-mix(in srgb, var(--vp-c-bg) 92%, transparent);
+  background: var(--vp-c-bg-soft);
+  text-align: left;
   cursor: pointer;
   transition:
-    transform 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease;
+    border-color 0.18s,
+    background-color 0.18s;
 }
 
-.choice-card:hover,
-.choice-card:focus-visible {
+.tool:hover,
+.tool:focus-visible {
   border-color: var(--vp-c-brand-1);
   outline: none;
-  box-shadow: 0 10px 28px color-mix(in srgb, var(--vp-c-brand-1) 12%, transparent);
-  transform: translateY(-2px);
 }
 
-.choice-card strong {
-  font-size: 16px;
-}
-
-.choice-card > span:last-child {
-  margin-top: 6px;
-  color: var(--vp-c-text-3);
-  font-size: 13px;
-}
-
-.answer-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.answer-card {
-  min-height: 180px;
-  justify-content: center;
-  padding: 26px;
-}
-
-.answer-card strong {
-  font-size: 20px;
-}
-
-.answer-card.recommended {
-  border-color: color-mix(in srgb, var(--vp-c-brand-1) 48%, var(--vp-c-divider));
-}
-
-.recommend-badge {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  border-radius: 999px;
-  padding: 3px 9px;
-  color: var(--vp-c-brand-1) !important;
+.tool.active {
+  border-color: var(--vp-c-brand-1);
   background: var(--vp-c-brand-soft);
-  font-size: 12px !important;
+}
+
+.sub .mark {
+  display: grid;
+  flex: 0 0 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
+  font-family: var(--vp-font-family-mono);
+  font-size: 13px;
   font-weight: 700;
+  letter-spacing: -0.02em;
+  transition:
+    color 0.18s,
+    background-color 0.18s;
 }
 
-.result-summary {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--vp-c-divider);
+.tool.active .mark,
+.sub-current .mark {
+  color: #fff;
+  background: var(--vp-c-brand-3);
 }
 
-.result-summary h2 {
-  margin: 6px 0 8px;
-  border: 0;
-  padding: 0;
-  scroll-margin-top: 90px;
-  font-size: clamp(25px, 4vw, 36px);
+.sub .mark.logo {
+  overflow: hidden;
+  background: transparent;
 }
 
-.result-summary h2:focus {
-  outline: none;
+.sub .mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
-.result-summary p:last-child {
-  max-width: 760px;
-  margin: 0;
+/* 选中的工具：logo 外圈一道品牌色描边，代替字母标的实心底 */
+.tool.active .mark.logo {
+  background: transparent;
+  box-shadow:
+    0 0 0 2px var(--vp-c-bg-soft),
+    0 0 0 4px var(--vp-c-brand-1);
+}
+
+.tool .name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+
+.tool .ext {
+  color: var(--vp-c-text-3);
+  font-family: var(--vp-font-family-mono);
+  font-size: 12px;
+}
+
+.sub-empty {
   color: var(--vp-c-text-2);
 }
 
-.coverage-list {
+/* ---------- 结果 ---------- */
+
+.sub-result {
+  position: sticky;
+  top: calc(var(--vp-nav-height) + 24px);
+  max-height: calc(100vh - var(--vp-nav-height) - 48px);
+  overflow-y: auto;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 18px;
+  padding: 24px;
+  background: var(--vp-c-bg-soft);
+}
+
+.res-head {
   display: flex;
-  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.res-tool {
+  margin: 0;
+  color: var(--vp-c-text-2);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.sub .res-head h2 {
+  margin: 2px 0 0;
+  border: 0;
+  padding: 0;
+  font-size: 22px;
+  line-height: 32px;
+  letter-spacing: 0;
+}
+
+.sweep {
+  display: inline-block;
+  margin-left: 6px;
+  color: var(--awa-mauve);
+  font-size: 12px;
+  font-weight: 500;
+  vertical-align: 2px;
+  animation: sweep-in 0.4s ease-out;
+}
+
+@keyframes sweep-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+}
+
+.res-count {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--vp-c-text-3);
+  font-size: 13px;
+  line-height: 32px;
+  white-space: nowrap;
+}
+
+.res-count b {
+  margin-right: 4px;
+  background: var(--awa-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: 30px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  vertical-align: -2px;
+}
+
+.cats {
+  display: grid;
   gap: 8px;
-  margin: 20px 0 14px;
+  margin-top: 18px;
+}
+
+.cat {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--vp-c-text-1);
+  background: var(--vp-c-bg);
+  text-align: left;
+  transition:
+    border-color 0.2s,
+    opacity 0.2s;
+}
+
+button.cat {
+  cursor: pointer;
+}
+
+button.cat:hover,
+button.cat:focus-visible {
+  border-color: var(--vp-c-brand-1);
+  outline: none;
+}
+
+.cat:not(.on) .cat-text,
+.cat:not(.on) .cat-num {
+  opacity: 0.45;
+}
+
+.cat .dot {
+  flex: 0 0 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--vp-c-divider);
+  transition:
+    background-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.cat.on .dot {
+  background: var(--awa-pink);
+  box-shadow: 0 0 8px var(--awa-pink);
+}
+
+.cat-text {
+  flex: 1;
+  min-width: 0;
+  transition: opacity 0.2s;
+}
+
+.cat-text strong {
+  display: block;
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.cat-text small {
+  display: block;
+  color: var(--vp-c-text-2);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.cat-num {
+  color: var(--vp-c-text-2);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  transition: opacity 0.2s;
+}
+
+.cat .track {
+  position: relative;
+  flex: 0 0 38px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--vp-c-divider);
+  transition: background-color 0.2s;
+}
+
+.cat .track i {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+
+.cat.on .track {
+  background: var(--vp-c-brand-3);
+}
+
+.cat.on .track i {
+  transform: translateX(16px);
+}
+
+.cat.locked .track {
+  opacity: 0.5;
+}
+
+.res-note,
+.res-placeholder {
+  margin: 18px 0 0;
+  color: var(--vp-c-text-2);
+  font-size: 14px;
+}
+
+.res-placeholder {
+  border: 1px dashed var(--vp-c-border);
+  border-radius: 12px;
+  padding: 18px;
+  text-align: center;
+}
+
+.res-source {
+  margin: 20px 0 6px;
+  color: var(--vp-c-text-2);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.sub .res-url {
+  display: block;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--vp-c-text-1);
+  background: var(--vp-c-bg);
+  font-size: 12.5px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.copy-wrap {
+  position: relative;
+  margin-top: 12px;
+}
+
+.copy-main {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 52px;
+  border-radius: 12px;
+  color: #fff;
+  background: var(--vp-c-brand-3);
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    transform 0.1s;
+}
+
+.copy-main:hover,
+.copy-main:focus-visible {
+  background: var(--vp-c-brand-2);
+}
+
+.copy-main:active {
+  transform: scale(0.985);
+}
+
+.leaf {
+  position: absolute;
+  top: 30px;
+  width: 18px;
+  height: 18px;
+  opacity: 0;
+  pointer-events: none;
+  animation: leaf-fall 1.1s ease-in forwards;
+}
+
+.leaf svg {
+  display: block;
+  fill: currentColor;
+}
+
+@keyframes leaf-fall {
+  0% {
+    opacity: 0;
+    transform: none;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--sway), 96px) rotate(var(--spin));
+  }
+}
+
+.copy-error {
+  margin: 8px 0 0;
+  color: var(--vp-c-danger-1);
+  font-size: 13px;
+}
+
+.sub .res-tutorial {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.res-more {
+  margin-top: 14px;
+  border-top: 1px solid var(--vp-c-divider);
+  padding-top: 12px;
+}
+
+.res-more summary {
+  color: var(--vp-c-text-2);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.res-more summary:hover {
+  color: var(--vp-c-brand-1);
+}
+
+.sub .res-more ul {
+  margin: 10px 0 0;
   padding: 0;
   list-style: none;
 }
 
-.coverage-list li {
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 999px;
-  padding: 6px 11px;
-  color: var(--vp-c-text-3);
-  font-size: 13px;
-  text-decoration: line-through;
+.sub .res-more li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 12px;
+  margin: 0;
+  padding: 8px 0;
 }
 
-.coverage-list li.enabled {
-  border-color: color-mix(in srgb, var(--vp-c-brand-1) 28%, var(--vp-c-divider));
+.sub .res-more li + li {
+  border-top: 1px solid var(--vp-c-divider);
+}
+
+.src-name {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.src-name em {
+  margin-left: 6px;
+  color: var(--vp-c-text-3);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+}
+
+.sub .res-more code {
+  grid-column: 1;
+  overflow: hidden;
+  padding: 0;
+  color: var(--vp-c-text-3);
+  background: none;
+  font-size: 12px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.res-more button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-width: 64px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  padding: 5px 12px;
   color: var(--vp-c-brand-1);
-  background: var(--vp-c-brand-soft);
+  background: var(--vp-c-bg);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.res-more button:hover,
+.res-more button:focus-visible {
+  border-color: var(--vp-c-brand-1);
+}
+
+.res-more button.done {
+  color: var(--awa-pink);
+}
+
+.sub-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 28px;
+  font-size: 13px;
+}
+
+.sub .sub-footer a {
+  color: var(--vp-c-text-2);
+  font-weight: 400;
   text-decoration: none;
 }
 
-.coverage-list li.enabled::before {
-  content: '✓ ';
-}
-
-.recommended-source {
-  margin-top: 20px;
-}
-
-.recommended-source-label {
-  margin: 0 0 10px;
-  color: var(--vp-c-text-2);
-  font-size: 14px;
-}
-
-.recommended-source .tutorial-link {
-  display: inline-block;
-  margin-top: 14px;
-}
-
-.profile-description {
-  color: var(--vp-c-text-2);
-}
-
-.more-sources {
-  margin-top: 24px;
-  border-top: 1px solid var(--vp-c-divider);
-  padding-top: 16px;
-}
-
-.more-sources > summary {
-  padding: 8px 0;
+.sub .sub-footer a:hover {
   color: var(--vp-c-brand-1);
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.result-filename code {
-  overflow-wrap: anywhere;
-}
-
-.tutorial-link {
-  border-radius: 9px;
-  padding: 9px 14px;
-  color: var(--vp-c-white);
-  background: var(--vp-c-brand-1);
-  font-weight: 700;
-}
-
-.tutorial-link:hover {
-  color: var(--vp-c-white);
-  background: var(--vp-c-brand-2);
-}
-
-.source-intro {
-  margin-top: 16px;
-}
-
-.source-intro h3 {
-  margin-bottom: 8px;
-  font-size: 25px;
-}
-
-.source-intro > p {
-  margin: 0;
-  color: var(--vp-c-text-2);
-}
-
-.source-note {
-  margin-top: 14px;
-  border-left: 3px solid var(--vp-c-brand-1);
-  border-radius: 0 8px 8px 0;
-  padding: 11px 14px;
-  color: var(--vp-c-text-2);
-  background: var(--vp-c-brand-soft);
-  font-size: 14px;
-}
-
-.source-section {
-  margin-top: 30px;
-}
-
-.source-section-heading p {
-  margin: -6px 0 14px;
-  color: var(--vp-c-text-3);
-  font-size: 14px;
-}
-
-.source-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.source-card {
-  min-width: 0;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 15px;
-  padding: 18px;
-  background: var(--vp-c-bg);
-}
-
-.domestic-card {
-  border-color: color-mix(in srgb, var(--vp-c-brand-1) 28%, var(--vp-c-divider));
-}
-
-.source-card-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  min-height: 86px;
-}
-
-.source-card h5 {
-  margin: 0 0 5px;
-  font-size: 17px;
-}
-
-.source-card p {
-  margin: 0 0 14px;
-  color: var(--vp-c-text-2);
-  font-size: 13px;
-  line-height: 1.55;
-}
-
-.source-badge {
-  flex: 0 0 auto;
-  border-radius: 999px;
-  padding: 4px 8px;
-  color: var(--vp-c-brand-1);
-  background: var(--vp-c-brand-soft);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.availability-note,
-.empty-state {
-  color: var(--vp-c-text-3);
-  font-size: 13px;
-}
-
-.wizard-footer {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px 20px;
-  margin-top: 20px;
-  color: var(--vp-c-text-3);
-  font-size: 13px;
-}
-
-.wizard-footer p {
-  margin: 0;
-}
-
-.footer-links {
-  display: flex;
-  gap: 14px;
 }
 
 .sr-only {
@@ -1089,10 +1080,48 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-@media (max-width: 820px) {
-  .tool-grid,
-  .source-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+/* ---------- 窄屏：单列，选完工具后列表收成一行 ---------- */
+
+@media (max-width: 859px) {
+  .sub-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .sub-result {
+    position: static;
+    max-height: none;
+    padding: 20px 16px;
+  }
+
+  .sub-tools.collapsed .sub-picker {
+    display: none;
+  }
+
+  .sub-tools.collapsed .sub-current {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid var(--vp-c-brand-1);
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: var(--vp-c-brand-soft);
+  }
+
+  .sub-current strong {
+    flex: 1;
+    min-width: 0;
+    font-size: 15px;
+  }
+
+  .sub-current button {
+    border: 1px solid var(--vp-c-divider);
+    border-radius: 8px;
+    padding: 5px 12px;
+    color: var(--vp-c-brand-1);
+    background: var(--vp-c-bg);
+    font-size: 13px;
+    font-weight: 600;
   }
 }
 
@@ -1101,40 +1130,25 @@ onMounted(() => {
     width: min(100%, calc(100% - 32px));
   }
 
-  .wizard-shell {
-    min-height: 0;
-    margin-inline: -12px;
-    border-radius: 16px;
-    padding: 20px 16px;
+  .tool-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .progress {
-    grid-template-columns: auto 1fr;
+  .tool {
+    gap: 8px;
+    padding: 8px;
   }
 
-  .tool-grid,
-  .answer-grid,
-  .source-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .answer-card {
-    min-height: 150px;
-  }
-
-  .result-summary {
-    flex-direction: column;
-  }
-
-  .source-card-heading {
-    min-height: 0;
+  .tool .ext {
+    display: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .choice-card,
-  .progress-track span {
-    transition: none;
+  .sub *,
+  .sub *::before {
+    animation: none !important;
+    transition: none !important;
   }
 }
 </style>

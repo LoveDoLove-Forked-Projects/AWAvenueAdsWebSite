@@ -1,19 +1,14 @@
----
-lastVerified: 2026-10-26
-verificationScope: docs
----
-
 # sing-box guide
 
-Applies to **sing-box 1.14.x**. Documentation checked: **2026-10-26**. This example uses the current HTTP client and DNS action formats; check the core version bundled with your graphical client before using it.
+The syntax below is for sing-box **1.14** and later. GUI clients: check the bundled core version first.
 
-## Get your chosen profile
+## Get the rule link
 
-Select sing-box and your blocking preferences in the [generator](./Sub.html?tool=singbox). Copy the `.json` URL. This file is a **source-format rule set**, not a complete proxy configuration.
+Choose sing-box and a profile in the [subscription builder](./Sub.html?tool=singbox) and copy the `.json` link. It's a source-format rule set, not a full config.
 
-## Merge the configuration
+## Merge into your config
 
-This fragment uses the full profile. Replace `url` with your generated URL for another profile. Merge the array entries into your existing configuration, preserve its DNS/upstream/inbound/proxy settings, and define each tag only once.
+The example uses the full-profile link; swap in yours. Merge each part into the matching place in your config without overwriting your existing DNS, inbounds, or outbounds.
 
 ```json
 {
@@ -53,20 +48,19 @@ This fragment uses the full profile. Replace `url` with your generated URL for a
 }
 ```
 
-- Place the rejection rule before broad DNS rules that would otherwise handle the query. Intentional allow exceptions may precede it.
-- Append `awa-bootstrap` to your existing DNS servers. It uses the system resolver for rule downloads; retain your normal DNS upstream. Avoid pointing system DNS back to the same sing-box instance before it has started.
-- Only queries reaching **sing-box's DNS module** are filtered here. Keep your existing DNS capture setup. Application DoH, cached answers, or direct IP connections can bypass this path. For connection-level filtering, an optional `{"rule_set":"awa-ads","action":"reject"}` entry in your existing `route.rules` also needs a domain available for matching.
-- Keep `format: "source"` for `.json`. If you switch to `.srs`, also switch to `binary`. Use a reachable download source.
+- Put this DNS reject rule above broader DNS rules.
+- `awa-bootstrap` resolves the download URL with system DNS, so sing-box doesn't depend on itself before it has started.
+- To block at the connection level too, add `{"rule_set":"awa-ads","action":"reject"}` to `route.rules`.
+- If you switch to an `.srs` link, change `format` to `binary`.
 
-## Verify
+## Check and verify
 
-1. Run `sing-box check -c config.json` against the **complete merged configuration**.
-2. Start it and check that the rule set downloads and loads. A successful syntax check does not prove a successful download. If needed, try another source. You may enable `experimental.cache_file.enabled` to retain downloaded rule sets, preserving other cache options.
-3. Pick a domain present in your selected file and query it through your sing-box DNS listener. This example returns **REFUSED** on a match. Confirm the match in debug logs and compare with a normal domain absent from the list.
-4. If it resolves unexpectedly, check the DNS path, earlier allow rules, and client caches. A failed browser request alone does not establish a rule match.
+1. Run `sing-box check -c config.json` on the merged config.
+2. After starting, check the log for a successful rule set download. If you already have `experimental.cache_file`, set `enabled` so the rule set is cached locally and not re-downloaded on every start.
+3. A DNS query for a domain from the list should return **REFUSED**; normal domains resolve as usual.
 
-Do not reuse the old `rcode://success` DNS server or `download_detour` examples. References: [DNS server migration](https://sing-box.sagernet.org/deprecated/#legacy-dns-server-formats), [DNS actions](https://sing-box.sagernet.org/configuration/dns/rule_action/), [rule sets](https://sing-box.sagernet.org/configuration/rule-set/), and [HTTP clients](https://sing-box.sagernet.org/configuration/shared/http-client/).
+References: [DNS rule actions](https://sing-box.sagernet.org/configuration/dns/rule_action/), [rule sets](https://sing-box.sagernet.org/configuration/rule-set/), [HTTP clients](https://sing-box.sagernet.org/configuration/shared/http-client/), [1.14 migration](https://sing-box.sagernet.org/deprecated/#legacy-dns-server-formats).
 
-## Updates and rollback
+## Undo
 
-First identify the matching domain in logs. For troubleshooting, remove the rejection entry added to `dns.rules` and any optional rejection entry you added to `route.rules`, check the complete configuration, then restart. Before removing `awa-ads` from `route.rule_set`, remove all rules referencing it. Keep download clients and DNS servers still used elsewhere, or restore your original configuration backup.
+Remove this reject rule from `dns.rules` (and the one you added to `route.rules`). Before also removing `awa-ads` from `route.rule_set`, make sure nothing else references it.
