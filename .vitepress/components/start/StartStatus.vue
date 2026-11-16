@@ -18,7 +18,7 @@
       <p class="status-eyebrow">{{ copy.counterEyebrow }}</p>
       <h3>{{ copy.counterTitle }}</h3>
       <p>{{ copy.counterHelp }}</p>
-      <img src="https://count.getloli.com/get/@TG-Twiligh?theme=booru-helltaker" :alt="copy.counterAlt" loading="lazy" width="666" />
+      <img src="https://count.awavenue.top/get/@TG-Twilight?theme=booru-helltaker" :alt="copy.counterAlt" loading="lazy" width="666" />
     </article>
   </section>
 </template>
